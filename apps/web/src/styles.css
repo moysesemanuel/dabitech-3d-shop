@@ -2166,6 +2166,7 @@ button {
 .admin-sidebar-card {
   display: grid;
   gap: 0.75rem;
+  min-height: calc(100vh - 2rem);
 }
 
 .admin-sidebar-card h2 {
@@ -2183,7 +2184,19 @@ button {
 }
 
 .admin-menu-group {
+  position: relative;
   border-radius: 0;
+}
+
+.admin-menu-group.is-active::before {
+  content: "";
+  position: absolute;
+  top: 0.48rem;
+  left: -0.75rem;
+  width: 4px;
+  height: 2rem;
+  border-radius: 0 999px 999px 0;
+  background: var(--brand);
 }
 
 .admin-menu-heading {
@@ -2198,6 +2211,10 @@ button {
   color: var(--text);
   padding: 0.72rem 0.45rem;
   text-align: left;
+}
+
+.admin-menu-group.is-active .admin-menu-heading {
+  color: var(--text);
 }
 
 .admin-menu-heading span:first-child {
@@ -2247,10 +2264,9 @@ button {
 }
 
 .admin-submenu .ghost-action.active-ghost {
-  border-left: 3px solid var(--brand);
   background: transparent;
   color: var(--text);
-  padding-left: calc(1rem - 3px);
+  padding-left: 1rem;
 }
 
 .admin-sidebar:hover .admin-menu-heading span:last-child,
@@ -2261,6 +2277,32 @@ button {
 .admin-menu-group.is-open .admin-menu-heading span:last-child {
   color: var(--brand);
   transform: rotate(180deg);
+}
+
+.admin-actions {
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+.admin-storefront-link {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  border-radius: 0.8rem;
+  background: var(--surface-strong);
+  color: var(--text);
+  padding: 0.9rem 1rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.admin-storefront-link svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
 }
 
 .admin-page-panel {
@@ -2284,7 +2326,7 @@ button {
 }
 
 .admin-actions {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .admin-list {

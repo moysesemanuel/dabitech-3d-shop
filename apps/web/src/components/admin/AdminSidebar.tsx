@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { BoxArrowUpRightIcon } from "../icons/BoxArrowUpRightIcon";
 import { adminMenuGroups, type AdminSection } from "./adminSections";
 
 interface AdminSidebarProps {
@@ -34,9 +35,13 @@ export function AdminSidebar({
             <section
               key={group.title}
               className={
-                openGroups.includes(group.title)
-                  ? "admin-menu-group is-open"
-                  : "admin-menu-group"
+                [
+                  "admin-menu-group",
+                  openGroups.includes(group.title) ? "is-open" : "",
+                  group.items.some((item) => item.section === adminSection) ? "is-active" : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")
               }
             >
               <button
@@ -76,11 +81,9 @@ export function AdminSidebar({
         </div>
 
         <div className="admin-actions">
-          <button className="ghost-action" type="button" onClick={onResetStorefront}>
-            Ver vitrine
-          </button>
-          <button className="admin-primary-action" type="button" onClick={onAddNewProduct}>
-            Novo produto
+          <button className="admin-storefront-link" type="button" onClick={onResetStorefront}>
+            <span>Ver vitrine</span>
+            <BoxArrowUpRightIcon />
           </button>
         </div>
       </div>

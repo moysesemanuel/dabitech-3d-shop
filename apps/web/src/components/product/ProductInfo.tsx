@@ -40,8 +40,6 @@ export function ProductInfo({
         <span className="shipping-badge">Frete grátis</span>
       </div>
 
-      <p className="product-page-description">{product.description}</p>
-
       <div className="tag-row detail-tags">
         {product.tags.map((tag) => (
           <span key={tag}>{tag}</span>

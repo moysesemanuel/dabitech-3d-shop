@@ -16,14 +16,10 @@ export function AdminSidebar({
   onResetStorefront,
   onAddNewProduct
 }: AdminSidebarProps) {
-  const [openGroups, setOpenGroups] = useState<string[]>(["Produtos"]);
+  const [openGroup, setOpenGroup] = useState("Produtos");
 
   function toggleGroup(groupTitle: string) {
-    setOpenGroups((current) =>
-      current.includes(groupTitle)
-        ? current.filter((title) => title !== groupTitle)
-        : [...current, groupTitle]
-    );
+    setOpenGroup((current) => (current === groupTitle ? "" : groupTitle));
   }
 
   return (
@@ -37,7 +33,7 @@ export function AdminSidebar({
               className={
                 [
                   "admin-menu-group",
-                  openGroups.includes(group.title) ? "is-open" : "",
+                  openGroup === group.title ? "is-open" : "",
                   group.items.some((item) => item.section === adminSection) ? "is-active" : ""
                 ]
                   .filter(Boolean)

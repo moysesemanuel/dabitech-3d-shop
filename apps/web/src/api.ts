@@ -1,4 +1,10 @@
-import type { Category, CreateOrderPayload, CreateOrderResponse, Product } from "./types";
+import type {
+  AuthResponse,
+  Category,
+  CreateOrderPayload,
+  CreateOrderResponse,
+  Product
+} from "./types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:4020";
 
@@ -11,6 +17,48 @@ export async function getProducts() {
 
   const data = (await response.json()) as { items: Product[] };
   return data.items;
+}
+
+export async function loginUser(payload: { email: string; password: string }) {
+  const response = await fetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = (await response.json()) as Partial<AuthResponse> & { message?: string };
+
+  if (!response.ok || !data.user || !data.token) {
+    throw new Error(data.message ?? "Falha ao entrar.");
+  }
+
+  return {
+    user: data.user,
+    token: data.token
+  };
+}
+
+export async function registerUser(payload: { name: string; email: string; password: string }) {
+  const response = await fetch(`${API_URL}/api/auth/register`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = (await response.json()) as Partial<AuthResponse> & { message?: string };
+
+  if (!response.ok || !data.user || !data.token) {
+    throw new Error(data.message ?? "Falha ao cadastrar.");
+  }
+
+  return {
+    user: data.user,
+    token: data.token
+  };
 }
 
 export async function createProduct(product: Product) {

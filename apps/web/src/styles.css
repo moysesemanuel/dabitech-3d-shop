@@ -709,6 +709,25 @@ button {
   padding: 0.4rem;
 }
 
+.profile-popup-user {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.25rem;
+  border-bottom: 1px solid var(--line);
+  padding: 0.55rem 0.5rem 0.8rem;
+}
+
+.profile-popup-user strong {
+  font-weight: 500;
+}
+
+.profile-popup-user span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .profile-popup-item {
   width: 100%;
   border: 0;
@@ -717,6 +736,10 @@ button {
   color: var(--text);
   padding: 0.75rem;
   text-align: left;
+}
+
+.danger-profile-action {
+  color: #dc2828;
 }
 
 .icon-link,
@@ -1922,6 +1945,82 @@ button {
 .order-confirmation p {
   color: var(--text);
   line-height: 1.6;
+}
+
+.auth-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: grid;
+  place-items: center;
+  background: rgba(17, 17, 17, 0.5);
+  padding: 1rem;
+}
+
+.auth-dialog {
+  display: grid;
+  gap: 1rem;
+  width: min(420px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+}
+
+.auth-dialog h2,
+.auth-dialog p {
+  margin: 0;
+}
+
+.auth-dialog h2 {
+  margin-top: 0.35rem;
+  font-size: 1.45rem;
+}
+
+.auth-dialog p {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.auth-dialog label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.auth-dialog label span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.auth-dialog input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 0.8rem 0.9rem;
+  outline: none;
+}
+
+.auth-dialog-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.auth-dialog-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.auth-mode-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  padding: 0.35rem;
+  font-weight: 500;
 }
 
 .utility-list {

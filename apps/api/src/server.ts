@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,6 +23,20 @@ const productsFilePath = join(
   dirname(fileURLToPath(import.meta.url)),
   "../src/data/products-admin.json"
 );
+const usersFilePath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../src/data/users.json"
+);
+
+interface StoredUser {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "customer";
+  passwordSalt: string;
+  passwordHash: string;
+  createdAt: string;
+}
 
 interface StoredOrder {
   id: string;
@@ -49,6 +64,55 @@ interface StoredOrder {
     subtotalInCents: number;
   }>;
   totalInCents: number;
+}
+
+function hashPassword(password: string, salt: string) {
+  return createHash("sha256").update(`${salt}:${password}`).digest("hex");
+}
+
+function sanitizeUser(user: StoredUser) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role
+  };
+}
+
+function createDefaultAdminUser(): StoredUser {
+  const passwordSalt = "dabi-tech-admin";
+
+  return {
+    id: "admin",
+    name: "Admin DaBi",
+    email: "admin@dabitech3d.com",
+    role: "admin",
+    passwordSalt,
+    passwordHash: hashPassword("admin123", passwordSalt),
+    createdAt: "2026-05-25T00:00:00.000Z"
+  };
+}
+
+async function readUsers() {
+  try {
+    const content = await readFile(usersFilePath, "utf8");
+    const storedUsers = JSON.parse(content) as StoredUser[];
+
+    if (Array.isArray(storedUsers) && storedUsers.length > 0) {
+      return storedUsers;
+    }
+  } catch {
+    // Seed the admin user below.
+  }
+
+  const defaultUsers = [createDefaultAdminUser()];
+  await saveUsers(defaultUsers);
+  return defaultUsers;
+}
+
+async function saveUsers(users: StoredUser[]) {
+  await mkdir(dirname(usersFilePath), { recursive: true });
+  await writeFile(usersFilePath, JSON.stringify(users, null, 2));
 }
 
 async function readOrders() {
@@ -130,6 +194,88 @@ server.get("/health", async () => ({
 server.get("/api/categories", async () => ({
   items: categories
 }));
+
+server.post("/api/auth/login", async (request, reply) => {
+  const body = request.body as {
+    email?: string;
+    password?: string;
+  };
+
+  if (!isFilledString(body.email) || !isFilledString(body.password)) {
+    reply.status(400);
+    return { message: "Informe e-mail e senha." };
+  }
+
+  const email = String(body.email).trim();
+  const password = String(body.password);
+  const users = await readUsers();
+  const normalizedEmail = email.toLowerCase();
+  const user = users.find((item) => item.email.toLowerCase() === normalizedEmail);
+
+  if (!user || user.passwordHash !== hashPassword(password, user.passwordSalt)) {
+    reply.status(401);
+    return { message: "E-mail ou senha inválidos." };
+  }
+
+  return {
+    token: `local-${user.id}-${Date.now()}`,
+    user: sanitizeUser(user)
+  };
+});
+
+server.post("/api/auth/register", async (request, reply) => {
+  const body = request.body as {
+    name?: string;
+    email?: string;
+    password?: string;
+  };
+
+  if (
+    !isFilledString(body.name) ||
+    !isFilledString(body.email) ||
+    !isFilledString(body.password)
+  ) {
+    reply.status(400);
+    return { message: "Informe nome, e-mail e senha." };
+  }
+
+  const name = String(body.name).trim();
+  const email = String(body.email).trim();
+  const password = String(body.password);
+
+  if (password.trim().length < 6) {
+    reply.status(400);
+    return { message: "A senha precisa ter pelo menos 6 caracteres." };
+  }
+
+  const users = await readUsers();
+  const normalizedEmail = email.toLowerCase();
+
+  if (users.some((user) => user.email.toLowerCase() === normalizedEmail)) {
+    reply.status(409);
+    return { message: "Já existe uma conta com este e-mail." };
+  }
+
+  const passwordSalt = randomUUID();
+  const user: StoredUser = {
+    id: `user-${Date.now()}`,
+    name,
+    email: normalizedEmail,
+    role: "customer",
+    passwordSalt,
+    passwordHash: hashPassword(password, passwordSalt),
+    createdAt: new Date().toISOString()
+  };
+
+  const nextUsers = [...users, user];
+  await saveUsers(nextUsers);
+
+  reply.status(201);
+  return {
+    token: `local-${user.id}-${Date.now()}`,
+    user: sanitizeUser(user)
+  };
+});
 
 server.get("/api/products", async (request) => {
   const query = request.query as {

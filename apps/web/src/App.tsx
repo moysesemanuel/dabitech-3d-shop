@@ -16,10 +16,19 @@ import {
   generateProductDescription,
   getCategories,
   getProducts,
+  loginUser,
+  registerUser,
   resetProducts,
   updateProduct as updateProductRequest
 } from "./api";
-import type { Category, CheckoutCustomer, CreateOrderResponse, Product, ProductColorOption } from "./types";
+import type {
+  AuthUser,
+  Category,
+  CheckoutCustomer,
+  CreateOrderResponse,
+  Product,
+  ProductColorOption
+} from "./types";
 
 import {
   buildAddressDetails,
@@ -83,16 +92,13 @@ type SortOption = "featured" | "price-asc" | "price-desc" | "name";
 type ThemeMode = "light" | "dark";
 type HeaderView = "all" | "offers" | "favorites";
 type UtilityPanelState = "coupons" | "orders" | "contact" | null;
+type AuthMode = "login" | "register" | null;
 type ToastState = { message: string; tone: "success" | "error" };
 
 interface CartItem {
   productId: string;
   quantity: number;
 }
-
-const signedInUser = {
-  name: "Moyses"
-};
 
 const mockNotifications = [
   "Seu carrinho tem itens com frete grátis.",
@@ -217,6 +223,15 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("featured");
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode>(null);
+  const [authForm, setAuthForm] = useState({
+    name: "",
+    email: "",
+    password: ""
+  });
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
   const [activeView, setActiveView] = useState<HeaderView>("all");
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -264,6 +279,7 @@ export default function App() {
     const storedAddresses = window.localStorage.getItem("store-addresses");
     const storedSelectedAddressId = window.localStorage.getItem("store-selected-address");
     const storedUiState = window.localStorage.getItem("store-ui-state");
+    const storedAuth = window.localStorage.getItem("store-auth");
 
     if (storedSlides) {
       try {
@@ -301,6 +317,22 @@ export default function App() {
         }
       } catch {
         window.localStorage.removeItem("store-addresses");
+      }
+    }
+
+    if (storedAuth) {
+      try {
+        const parsedAuth = JSON.parse(storedAuth) as {
+          token?: string;
+          user?: AuthUser;
+        };
+
+        if (parsedAuth.token && parsedAuth.user) {
+          setAuthToken(parsedAuth.token);
+          setAuthUser(parsedAuth.user);
+        }
+      } catch {
+        window.localStorage.removeItem("store-auth");
       }
     }
 
@@ -346,6 +378,25 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem("store-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!hasRestoredLocalState) {
+      return;
+    }
+
+    if (authUser && authToken) {
+      window.localStorage.setItem(
+        "store-auth",
+        JSON.stringify({
+          user: authUser,
+          token: authToken
+        })
+      );
+      return;
+    }
+
+    window.localStorage.removeItem("store-auth");
+  }, [authToken, authUser, hasRestoredLocalState]);
 
   useEffect(() => {
     if (!hasRestoredLocalState) {
@@ -530,6 +581,8 @@ export default function App() {
   const catalogProducts = editableProducts.length > 0 ? editableProducts : products;
   const materials = Array.from(new Set(catalogProducts.map((product) => product.material)));
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
+  const profileName = authUser?.name ?? "Entrar";
+  const profileInitial = authUser?.name.slice(0, 1).toUpperCase() ?? "D";
   const selectedAddress =
     addresses.find((address) => address.id === selectedAddressId) ?? addresses[0];
 
@@ -1176,6 +1229,17 @@ export default function App() {
   }
 
   function openAdminPanel() {
+    if (!authUser) {
+      openAuthDialog("login");
+      return;
+    }
+
+    if (authUser.role !== "admin") {
+      showToast("Apenas usuários admin podem acessar o painel.", "error");
+      setIsProfileMenuOpen(false);
+      return;
+    }
+
     setAdminSlideDrafts(slides);
     setIsProfileMenuOpen(false);
     setIsAdminOpen(true);
@@ -1288,6 +1352,56 @@ export default function App() {
     } finally {
       setIsSubmittingOrder(false);
     }
+  }
+
+  function openAuthDialog(mode: Exclude<AuthMode, null>) {
+    setAuthMode(mode);
+    setIsProfileMenuOpen(false);
+    setAuthForm({
+      name: "",
+      email: "",
+      password: ""
+    });
+  }
+
+  async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!authMode) {
+      return;
+    }
+
+    setIsSubmittingAuth(true);
+
+    try {
+      const response =
+        authMode === "login"
+          ? await loginUser({
+            email: authForm.email,
+            password: authForm.password
+          })
+          : await registerUser({
+            name: authForm.name,
+            email: authForm.email,
+            password: authForm.password
+          });
+
+      setAuthUser(response.user);
+      setAuthToken(response.token);
+      setAuthMode(null);
+      showToast(authMode === "login" ? "Login realizado." : "Cadastro criado.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Não foi possível autenticar.", "error");
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  }
+
+  function signOut() {
+    setAuthUser(null);
+    setAuthToken(null);
+    setIsProfileMenuOpen(false);
+    showToast("Você saiu da conta.");
   }
 
   function handleOffersClick() {
@@ -1575,7 +1689,7 @@ export default function App() {
                   </svg>
                 </span>
                 <span className="location-copy">
-                  <span className="location-eyebrow">Enviar para {signedInUser.name}</span>
+                  <span className="location-eyebrow">Enviar para {authUser?.name ?? "visitante"}</span>
                   <strong>
                     {selectedAddress ? buildAddressSummary(selectedAddress) : "Escolha o local de entrega"}
                   </strong>
@@ -1589,7 +1703,7 @@ export default function App() {
                       <div className="location-dropdown-header">
                         <div>
                           <span className="panel-kicker">Escolha onde receber</span>
-                          <h2>{signedInUser.name}, selecione um endereço</h2>
+                          <h2>{authUser?.name ?? "Visitante"}, selecione um endereço</h2>
                         </div>
                       </div>
 
@@ -1810,12 +1924,36 @@ export default function App() {
               <div className="header-actions">
                 <div className="profile-menu-shell" ref={profileMenuRef}>
                   <button className="profile-trigger" type="button" onClick={openProfileMenu}>
-                    <span className="profile-avatar">{signedInUser.name.slice(0, 1)}</span>
-                    <span>{signedInUser.name}</span>
+                    <span className="profile-avatar">{profileInitial}</span>
+                    <span>{profileName}</span>
                   </button>
 
                   {isProfileMenuOpen ? (
                     <div className="profile-popup">
+                      {authUser ? (
+                        <div className="profile-popup-user">
+                          <strong>{authUser.name}</strong>
+                          <span>{authUser.email}</span>
+                        </div>
+                      ) : null}
+                      {!authUser ? (
+                        <>
+                          <button
+                            className="profile-popup-item"
+                            type="button"
+                            onClick={() => openAuthDialog("login")}
+                          >
+                            Entrar
+                          </button>
+                          <button
+                            className="profile-popup-item"
+                            type="button"
+                            onClick={() => openAuthDialog("register")}
+                          >
+                            Criar cadastro
+                          </button>
+                        </>
+                      ) : null}
                       <button
                         className="profile-popup-item"
                         type="button"
@@ -1836,10 +1974,26 @@ export default function App() {
                       <button
                         className="profile-popup-item"
                         type="button"
-                        onClick={openAdminPanel}
+                        onClick={() => {
+                          if (!authUser) {
+                            openAuthDialog("login");
+                            return;
+                          }
+
+                          openAdminPanel();
+                        }}
                       >
                         Painel admin
                       </button>
+                      {authUser ? (
+                        <button
+                          className="profile-popup-item danger-profile-action"
+                          type="button"
+                          onClick={signOut}
+                        >
+                          Sair
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -1974,6 +2128,87 @@ export default function App() {
           orders={mockOrders}
           onClose={() => setActiveUtilityPanel(null)}
         />
+      ) : null}
+
+      {authMode ? (
+        <div className="auth-dialog-backdrop" onClick={() => setAuthMode(null)}>
+          <form
+            className="auth-dialog"
+            onSubmit={handleAuthSubmit}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div>
+              <span className="panel-kicker">{authMode === "login" ? "Entrar" : "Cadastro"}</span>
+              <h2>{authMode === "login" ? "Acesse sua conta" : "Crie sua conta"}</h2>
+              <p>
+                {authMode === "login"
+                  ? "Entre para acessar compras, endereços e painel administrativo."
+                  : "Cadastre-se para finalizar compras e acompanhar pedidos."}
+              </p>
+            </div>
+
+            {authMode === "register" ? (
+              <label>
+                <span>Nome</span>
+                <input
+                  value={authForm.name}
+                  onChange={(event) =>
+                    setAuthForm((current) => ({ ...current, name: event.target.value }))
+                  }
+                  placeholder="Seu nome"
+                  required
+                />
+              </label>
+            ) : null}
+
+            <label>
+              <span>E-mail</span>
+              <input
+                type="email"
+                value={authForm.email}
+                onChange={(event) =>
+                  setAuthForm((current) => ({ ...current, email: event.target.value }))
+                }
+                placeholder="voce@email.com"
+                required
+              />
+            </label>
+
+            <label>
+              <span>Senha</span>
+              <input
+                type="password"
+                value={authForm.password}
+                onChange={(event) =>
+                  setAuthForm((current) => ({ ...current, password: event.target.value }))
+                }
+                placeholder="Mínimo 6 caracteres"
+                required
+              />
+            </label>
+
+            <div className="auth-dialog-actions">
+              <button className="ghost-action" type="button" onClick={() => setAuthMode(null)}>
+                Cancelar
+              </button>
+              <button className="admin-primary-action" type="submit" disabled={isSubmittingAuth}>
+                {isSubmittingAuth
+                  ? "Aguarde..."
+                  : authMode === "login"
+                    ? "Entrar"
+                    : "Cadastrar"}
+              </button>
+            </div>
+
+            <button
+              className="auth-mode-toggle"
+              type="button"
+              onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}
+            >
+              {authMode === "login" ? "Não tenho cadastro" : "Já tenho conta"}
+            </button>
+          </form>
+        </div>
       ) : null}
 
       {toast ? (

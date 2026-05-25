@@ -72,3 +72,15 @@ export interface CreateOrderResponse {
   order: Order;
   instructions: string;
 }
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "customer";
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
+}

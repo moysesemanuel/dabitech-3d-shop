@@ -1,11 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-type ApiServer = typeof import("../apps/api/src/server")["server"];
+type ApiServer = typeof import("../apps/api/src/server.js")["server"];
 
 let serverPromise: Promise<ApiServer> | null = null;
 
 async function getServer() {
-  serverPromise ??= import("../apps/api/src/server").then(async ({ server }) => {
+  serverPromise ??= import("../apps/api/src/server.js").then(async ({ server }) => {
     await server.ready();
     return server;
   });

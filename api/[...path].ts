@@ -9,5 +9,10 @@ export default async function handler(
   response: ServerResponse
 ) {
   await ready;
+
+  if (request.url && !request.url.startsWith("/api/")) {
+    request.url = `/api${request.url.startsWith("/") ? request.url : `/${request.url}`}`;
+  }
+
   server.server.emit("request", request, response);
 }

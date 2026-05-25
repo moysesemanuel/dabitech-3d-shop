@@ -169,6 +169,14 @@ const defaultPromoCards: PromoCard[] = [
   }
 ];
 
+const fallbackCategories: Category[] = [
+  { id: "all", label: "Todos" },
+  { id: "decor", label: "Decor" },
+  { id: "gaming", label: "Gaming" },
+  { id: "fashion", label: "Fashion" },
+  { id: "workspace", label: "Workspace" }
+];
+
 const defaultAddresses: UserAddress[] = [
   {
     id: "home",
@@ -539,33 +547,48 @@ export default function App() {
     let isMounted = true;
 
     async function load() {
+      let hasLoadError = false;
+
       try {
-        const [categoryItems, productItems] = await Promise.all([
-          getCategories(),
-          getProducts()
-        ]);
+        const categoryItems = await getCategories();
 
         if (!isMounted) {
           return;
         }
 
-        setCategories(categoryItems);
+        setCategories(categoryItems.length > 0 ? categoryItems : fallbackCategories);
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+
+        hasLoadError = true;
+        setCategories(fallbackCategories);
+      }
+
+      try {
+        const productItems = await getProducts();
+
+        if (!isMounted) {
+          return;
+        }
+
         const normalizedProducts = productItems.map(normalizeProduct);
 
         setProducts(normalizedProducts);
         setEditableProducts(normalizedProducts);
-      } catch (loadError) {
+      } catch {
         if (!isMounted) {
           return;
         }
 
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Não foi possível carregar a loja."
-        );
+        hasLoadError = true;
+        setError("Falha ao carregar produtos.");
       } finally {
         if (isMounted) {
+          if (!hasLoadError) {
+            setError(null);
+          }
           setIsLoading(false);
         }
       }
@@ -583,8 +606,9 @@ export default function App() {
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const profileName = authUser?.name ?? "Entrar";
   const profileInitial = authUser?.name.slice(0, 1).toUpperCase() ?? "D";
-  const selectedAddress =
-    addresses.find((address) => address.id === selectedAddressId) ?? addresses[0];
+  const selectedAddress = authUser
+    ? addresses.find((address) => address.id === selectedAddressId) ?? addresses[0]
+    : null;
 
   function showToast(message: string, tone: ToastState["tone"] = "success") {
     setToast({ message, tone });
@@ -1145,6 +1169,11 @@ export default function App() {
   }
 
   function openLocationMenu() {
+    if (!authUser) {
+      openAuthDialog("login");
+      return;
+    }
+
     setPendingAddressId(selectedAddressId);
     setIsAddingLocation(false);
     setIsCategoriesMenuOpen(false);
@@ -1689,9 +1718,13 @@ export default function App() {
                   </svg>
                 </span>
                 <span className="location-copy">
-                  <span className="location-eyebrow">Enviar para {authUser?.name ?? "visitante"}</span>
+                  <span className="location-eyebrow">
+                    {authUser ? `Enviar para ${authUser.name}` : "Informe seu local de entrega"}
+                  </span>
                   <strong>
-                    {selectedAddress ? buildAddressSummary(selectedAddress) : "Escolha o local de entrega"}
+                    {authUser && selectedAddress
+                      ? buildAddressSummary(selectedAddress)
+                      : "Entrar para escolher endereço"}
                   </strong>
                 </span>
               </button>
@@ -1965,6 +1998,11 @@ export default function App() {
                         className="profile-popup-item"
                         type="button"
                         onClick={() => {
+                          if (!authUser) {
+                            openAuthDialog("login");
+                            return;
+                          }
+
                           setIsProfileMenuOpen(false);
                           setIsLocationMenuOpen(true);
                         }}

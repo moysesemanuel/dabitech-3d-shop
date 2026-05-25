@@ -3,12 +3,12 @@ import { neon } from "@neondatabase/serverless";
 import Fastify from "fastify";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { categories, products, type Product } from "./data/products.js";
 
-const server = Fastify({
+export const server = Fastify({
   logger: true
 });
 
@@ -731,13 +731,18 @@ server.post("/api/ai/product-description", async (request, reply) => {
 
 const port = Number(process.env.PORT ?? 4020);
 const host = process.env.HOST ?? "127.0.0.1";
+const isDirectRun =
+  process.argv[1] !== undefined &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 
-server
-  .listen({
-    port,
-    host
-  })
-  .catch((error) => {
-    server.log.error(error);
-    process.exit(1);
-  });
+if (isDirectRun) {
+  server
+    .listen({
+      port,
+      host
+    })
+    .catch((error) => {
+      server.log.error(error);
+      process.exit(1);
+    });
+}

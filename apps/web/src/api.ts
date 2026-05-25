@@ -6,7 +6,8 @@ import type {
   Product
 } from "./types";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:4020";
+const API_URL =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? "" : "http://127.0.0.1:4020");
 
 export async function getProducts() {
   const response = await fetch(`${API_URL}/api/products`);

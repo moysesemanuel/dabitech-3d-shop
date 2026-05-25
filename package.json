@@ -2,6 +2,9 @@
   "name": "e-commerce-3d",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": "22.x"
+  },
   "workspaces": [
     "apps/*"
   ],
@@ -12,4 +15,3 @@
     "lint": "npm run lint --workspaces"
   }
 }
-

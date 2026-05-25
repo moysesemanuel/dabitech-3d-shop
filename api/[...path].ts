@@ -1,14 +1,23 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-import { server } from "../apps/api/src/server";
+type ApiServer = typeof import("../apps/api/src/server")["server"];
 
-const ready = server.ready();
+let serverPromise: Promise<ApiServer> | null = null;
+
+async function getServer() {
+  serverPromise ??= import("../apps/api/src/server").then(async ({ server }) => {
+    await server.ready();
+    return server;
+  });
+
+  return serverPromise;
+}
 
 export default async function handler(
   request: IncomingMessage,
   response: ServerResponse
 ) {
-  await ready;
+  const server = await getServer();
 
   if (request.url && !request.url.startsWith("/api/")) {
     request.url = `/api${request.url.startsWith("/") ? request.url : `/${request.url}`}`;

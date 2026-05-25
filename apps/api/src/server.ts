@@ -13,7 +13,9 @@ const server = Fastify({
 });
 
 await server.register(cors, {
-  origin: true
+  origin: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["content-type", "authorization"]
 });
 
 const databaseUrl = process.env.DATABASE_URL;

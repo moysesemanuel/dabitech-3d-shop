@@ -1987,6 +1987,68 @@ button {
   gap: 1rem;
 }
 
+.admin-menu {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.admin-menu-group {
+  border: 1px solid transparent;
+  border-radius: 0.8rem;
+}
+
+.admin-menu-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  border-radius: 0.7rem;
+  background: transparent;
+  color: var(--text);
+  padding: 0.72rem 0.8rem;
+  text-align: left;
+}
+
+.admin-menu-heading span:first-child {
+  font-weight: 500;
+}
+
+.admin-menu-heading span:last-child {
+  color: var(--muted);
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.admin-submenu {
+  display: grid;
+  gap: 0.35rem;
+  max-height: 0;
+  overflow: hidden;
+  padding: 0 0.35rem;
+  opacity: 0;
+  transition: max-height 180ms ease, opacity 180ms ease, padding 180ms ease;
+}
+
+.admin-sidebar:hover .admin-menu-group,
+.admin-menu-group:focus-within {
+  border-color: var(--line);
+  background: var(--surface-soft);
+}
+
+.admin-sidebar:hover .admin-submenu,
+.admin-menu-group:focus-within .admin-submenu {
+  max-height: 34rem;
+  opacity: 1;
+  padding: 0.25rem 0.35rem 0.55rem;
+}
+
+.admin-sidebar:hover .admin-menu-heading span:last-child,
+.admin-menu-group:focus-within .admin-menu-heading span:last-child {
+  color: var(--brand);
+  transform: rotate(180deg);
+}
+
 .admin-page-panel {
   padding: 1rem;
 }
@@ -1994,6 +2056,13 @@ button {
 .admin-page-panel-header {
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--line);
+}
+
+.admin-page-panel-header p {
+  max-width: 62ch;
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .admin-toolbar {
@@ -2008,6 +2077,32 @@ button {
   display: grid;
   gap: 0.9rem;
   margin-top: 1rem;
+}
+
+.admin-placeholder {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 0.95rem;
+  background: var(--surface-soft);
+  padding: 1.25rem;
+}
+
+.admin-placeholder h3,
+.admin-placeholder p {
+  margin: 0;
+}
+
+.admin-placeholder h3 {
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.admin-placeholder p {
+  max-width: 62ch;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .admin-product-list {

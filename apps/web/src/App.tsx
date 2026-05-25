@@ -77,12 +77,12 @@ import { AdminPanelHeader } from "./components/admin/AdminPanelHeader";
 import { AdminPromoCardsEditor } from "./components/admin/AdminPromoCardsEditor";
 import { AdminSlidesEditor } from "./components/admin/AdminSlidesEditor";
 import { AdminProductList } from "./components/admin/AdminProductList";
+import { adminSectionLabels, type AdminSection } from "./components/admin/adminSections";
 
 type SortOption = "featured" | "price-asc" | "price-desc" | "name";
 type ThemeMode = "light" | "dark";
 type HeaderView = "all" | "offers" | "favorites";
 type UtilityPanelState = "coupons" | "orders" | "contact" | null;
-type AdminSection = "slides" | "promos" | "products";
 type ToastState = { message: string; tone: "success" | "error" };
 
 interface CartItem {
@@ -1526,6 +1526,17 @@ export default function App() {
                   onProductGalleryDrop={handleProductGalleryDrop}
                   onRemoveAdminProductDraftGalleryImage={removeAdminProductDraftGalleryImage}
                 />
+              ) : null}
+
+              {!["slides", "promos", "products"].includes(adminSection) ? (
+                <div className="admin-placeholder">
+                  <span className="panel-kicker">Em preparação</span>
+                  <h3>{adminSectionLabels[adminSection].title}</h3>
+                  <p>
+                    Esta área já está posicionada no menu do MVP para manter a estrutura
+                    administrativa completa. A funcionalidade será conectada em uma próxima etapa.
+                  </p>
+                </div>
               ) : null}
             </section>
           </section>

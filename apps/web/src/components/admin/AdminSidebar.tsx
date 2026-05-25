@@ -1,4 +1,4 @@
-type AdminSection = "slides" | "promos" | "products";
+import { adminMenuGroups, type AdminSection } from "./adminSections";
 
 interface AdminSidebarProps {
   adminSection: AdminSection;
@@ -16,29 +16,40 @@ export function AdminSidebar({
   return (
     <aside className="admin-sidebar">
       <div className="filter-card admin-sidebar-card">
-        <h2>Seções</h2>
-        <div className="admin-toolbar">
-          <button
-            className={adminSection === "slides" ? "ghost-action active-ghost" : "ghost-action"}
-            type="button"
-            onClick={() => onChangeSection("slides")}
-          >
-            Carrossel
-          </button>
-          <button
-            className={adminSection === "promos" ? "ghost-action active-ghost" : "ghost-action"}
-            type="button"
-            onClick={() => onChangeSection("promos")}
-          >
-            Cards
-          </button>
-          <button
-            className={adminSection === "products" ? "ghost-action active-ghost" : "ghost-action"}
-            type="button"
-            onClick={() => onChangeSection("products")}
-          >
-            Produtos
-          </button>
+        <h2>Administração</h2>
+        <div className="admin-menu">
+          {adminMenuGroups.map((group) => (
+            <section key={group.title} className="admin-menu-group">
+              <button className="admin-menu-heading" type="button">
+                <span>{group.title}</span>
+                <span aria-hidden="true">▾</span>
+              </button>
+
+              <div className="admin-submenu">
+                {group.items.map((item) => (
+                  <button
+                    key={item.section}
+                    className={
+                      adminSection === item.section
+                        ? "ghost-action active-ghost"
+                        : "ghost-action"
+                    }
+                    type="button"
+                    onClick={() => {
+                      if (item.action === "create-product") {
+                        onAddNewProduct();
+                        return;
+                      }
+
+                      onChangeSection(item.section);
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
 
         <div className="admin-actions">

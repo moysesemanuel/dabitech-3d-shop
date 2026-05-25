@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { categories, products } from "./data/products.js";
+import { categories, products, type Product } from "./data/products.js";
 
 const server = Fastify({
   logger: true
@@ -17,6 +17,10 @@ await server.register(cors, {
 const ordersFilePath = join(
   dirname(fileURLToPath(import.meta.url)),
   "../src/data/orders.json"
+);
+const productsFilePath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../src/data/products-admin.json"
 );
 
 interface StoredOrder {
@@ -61,8 +65,48 @@ async function saveOrders(orders: StoredOrder[]) {
   await writeFile(ordersFilePath, JSON.stringify(orders, null, 2));
 }
 
+async function readCatalogProducts() {
+  try {
+    const content = await readFile(productsFilePath, "utf8");
+    const storedProducts = JSON.parse(content) as Product[];
+
+    if (Array.isArray(storedProducts) && storedProducts.length > 0) {
+      return storedProducts;
+    }
+  } catch {
+    // Use bundled products until the admin saves the catalog for the first time.
+  }
+
+  return products;
+}
+
+async function saveCatalogProducts(nextProducts: Product[]) {
+  await mkdir(dirname(productsFilePath), { recursive: true });
+  await writeFile(productsFilePath, JSON.stringify(nextProducts, null, 2));
+}
+
 function isFilledString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isProductPayload(value: unknown): value is Product {
+  const product = value as Product;
+
+  return (
+    typeof product === "object" &&
+    product !== null &&
+    isFilledString(product.id) &&
+    isFilledString(product.name) &&
+    isFilledString(product.slug) &&
+    Number.isFinite(product.priceInCents) &&
+    isFilledString(product.category) &&
+    isFilledString(product.material) &&
+    isFilledString(product.dimensions) &&
+    isFilledString(product.accentColor) &&
+    typeof product.featured === "boolean" &&
+    isFilledString(product.description) &&
+    Array.isArray(product.tags)
+  );
 }
 
 function createOrderId() {
@@ -95,8 +139,9 @@ server.get("/api/products", async (request) => {
   };
 
   const normalizedQuery = query.q?.trim().toLowerCase();
+  const catalogProducts = await readCatalogProducts();
 
-  const items = products.filter((product) => {
+  const items = catalogProducts.filter((product) => {
     const categoryMatch =
       !query.category || query.category === "all"
         ? true
@@ -128,7 +173,8 @@ server.get("/api/products", async (request) => {
 
 server.get("/api/products/:slug", async (request, reply) => {
   const params = request.params as { slug: string };
-  const product = products.find((item) => item.slug === params.slug);
+  const catalogProducts = await readCatalogProducts();
+  const product = catalogProducts.find((item) => item.slug === params.slug);
 
   if (!product) {
     reply.status(404);
@@ -138,6 +184,83 @@ server.get("/api/products/:slug", async (request, reply) => {
   }
 
   return product;
+});
+
+server.post("/api/products", async (request, reply) => {
+  const body = request.body;
+
+  if (!isProductPayload(body)) {
+    reply.status(400);
+    return { message: "Produto inválido." };
+  }
+
+  const catalogProducts = await readCatalogProducts();
+
+  if (catalogProducts.some((product) => product.id === body.id || product.slug === body.slug)) {
+    reply.status(409);
+    return { message: "Já existe um produto com este ID ou slug." };
+  }
+
+  const nextProducts = [...catalogProducts, body];
+  await saveCatalogProducts(nextProducts);
+
+  reply.status(201);
+  return { product: body, items: nextProducts };
+});
+
+server.put("/api/products/:id", async (request, reply) => {
+  const params = request.params as { id: string };
+  const body = request.body;
+
+  if (!isProductPayload(body) || body.id !== params.id) {
+    reply.status(400);
+    return { message: "Produto inválido." };
+  }
+
+  const catalogProducts = await readCatalogProducts();
+  const productExists = catalogProducts.some((product) => product.id === params.id);
+
+  if (!productExists) {
+    reply.status(404);
+    return { message: "Produto não encontrado." };
+  }
+
+  if (
+    catalogProducts.some(
+      (product) => product.id !== params.id && product.slug === body.slug
+    )
+  ) {
+    reply.status(409);
+    return { message: "Já existe outro produto com este slug." };
+  }
+
+  const nextProducts = catalogProducts.map((product) =>
+    product.id === params.id ? body : product
+  );
+  await saveCatalogProducts(nextProducts);
+
+  return { product: body, items: nextProducts };
+});
+
+server.delete("/api/products/:id", async (request, reply) => {
+  const params = request.params as { id: string };
+  const catalogProducts = await readCatalogProducts();
+  const nextProducts = catalogProducts.filter((product) => product.id !== params.id);
+
+  if (nextProducts.length === catalogProducts.length) {
+    reply.status(404);
+    return { message: "Produto não encontrado." };
+  }
+
+  await saveCatalogProducts(nextProducts);
+
+  return { items: nextProducts };
+});
+
+server.post("/api/products/reset", async () => {
+  await saveCatalogProducts(products);
+
+  return { items: products };
 });
 
 server.post("/api/orders", async (request, reply) => {
@@ -196,8 +319,9 @@ server.post("/api/orders", async (request, reply) => {
     return { message: "Informe cliente e endereço para finalizar o pedido." };
   }
 
+  const catalogProducts = await readCatalogProducts();
   const orderItems = body.items.map((item) => {
-    const product = products.find((entry) => entry.id === item.productId);
+    const product = catalogProducts.find((entry) => entry.id === item.productId);
     const quantity = Math.max(1, Math.floor(Number(item.quantity ?? 0)));
 
     if (!product || !Number.isFinite(quantity)) {

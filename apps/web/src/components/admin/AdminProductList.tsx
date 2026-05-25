@@ -12,8 +12,8 @@ interface AdminProductListProps {
   isGeneratingAdminDescription: boolean;
   onOpenAdminProductEditor: (product: Product) => void;
   onCancelAdminProductEditor: () => void;
-  onSaveAdminProductEditor: () => void;
-  onRemoveProduct: (productId: string) => void;
+  onSaveAdminProductEditor: () => void | Promise<void>;
+  onRemoveProduct: (productId: string) => void | Promise<void>;
   onUpdateAdminProductDraft: (field: keyof Product, value: string | boolean) => void;
   onUpdateAdminProductDraftDimensions: (field: "width" | "height", value: string) => void;
   onGenerateAdminDraftDescription: () => void;

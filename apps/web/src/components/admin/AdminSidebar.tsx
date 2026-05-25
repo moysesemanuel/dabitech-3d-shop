@@ -4,7 +4,7 @@ interface AdminSidebarProps {
   adminSection: AdminSection;
   onChangeSection: (section: AdminSection) => void;
   onResetStorefront: () => void;
-  onAddNewProduct: () => void;
+  onAddNewProduct: () => void | Promise<void>;
 }
 
 export function AdminSidebar({

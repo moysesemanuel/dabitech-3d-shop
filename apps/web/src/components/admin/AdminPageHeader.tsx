@@ -1,5 +1,5 @@
 interface AdminPageHeaderProps {
-  onResetAdminContent: () => void;
+  onResetAdminContent: () => void | Promise<void>;
   onCloseAdmin: () => void;
 }
 

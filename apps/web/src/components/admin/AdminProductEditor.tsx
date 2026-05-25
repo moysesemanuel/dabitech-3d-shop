@@ -17,7 +17,7 @@ interface AdminProductEditorProps {
   onProductGalleryDrop: (productId: string, event: DragEvent<HTMLLabelElement>) => void;
   onRemoveAdminProductDraftGalleryImage: (imageIndex: number) => void;
   onCancelAdminProductEditor: () => void;
-  onSaveAdminProductEditor: () => void;
+  onSaveAdminProductEditor: () => void | Promise<void>;
 }
 
 export function AdminProductEditor({

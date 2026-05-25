@@ -9,7 +9,16 @@ import {
   type FormEvent
 } from "react";
 
-import { createOrder, generateProductDescription, getCategories, getProducts } from "./api";
+import {
+  createOrder,
+  createProduct,
+  deleteProduct as deleteProductRequest,
+  generateProductDescription,
+  getCategories,
+  getProducts,
+  resetProducts,
+  updateProduct as updateProductRequest
+} from "./api";
 import type { Category, CheckoutCustomer, CreateOrderResponse, Product, ProductColorOption } from "./types";
 
 import {
@@ -252,7 +261,6 @@ export default function App() {
   useEffect(() => {
     const storedSlides = window.localStorage.getItem("store-admin-slides");
     const storedPromoCards = window.localStorage.getItem("store-admin-promos");
-    const storedProducts = window.localStorage.getItem("store-admin-products");
     const storedAddresses = window.localStorage.getItem("store-addresses");
     const storedSelectedAddressId = window.localStorage.getItem("store-selected-address");
     const storedUiState = window.localStorage.getItem("store-ui-state");
@@ -279,18 +287,6 @@ export default function App() {
         }
       } catch {
         window.localStorage.removeItem("store-admin-promos");
-      }
-    }
-
-    if (storedProducts) {
-      try {
-        const parsedProducts = JSON.parse(storedProducts) as Product[];
-
-        if (Array.isArray(parsedProducts) && parsedProducts.length > 0) {
-          setEditableProducts(parsedProducts.map(normalizeProduct));
-        }
-      } catch {
-        window.localStorage.removeItem("store-admin-products");
       }
     }
 
@@ -380,25 +376,6 @@ export default function App() {
 
     window.localStorage.setItem("store-admin-promos", JSON.stringify(promoCards));
   }, [hasRestoredLocalState, promoCards]);
-
-  useEffect(() => {
-    if (!hasRestoredLocalState) {
-      return;
-    }
-
-    if (editableProducts.length > 0) {
-      try {
-        window.localStorage.setItem("store-admin-products", JSON.stringify(editableProducts));
-      } catch (error) {
-        if (isStorageQuotaError(error)) {
-          setAdminUploadError("As imagens dos produtos ultrapassaram o limite de armazenamento local.");
-          return;
-        }
-
-        throw error;
-      }
-    }
-  }, [editableProducts, hasRestoredLocalState]);
 
   useEffect(() => {
     if (!hasRestoredLocalState) {
@@ -525,9 +502,7 @@ export default function App() {
         const normalizedProducts = productItems.map(normalizeProduct);
 
         setProducts(normalizedProducts);
-        setEditableProducts((current) =>
-          current.length > 0 ? current.map(normalizeProduct) : normalizedProducts
-        );
+        setEditableProducts(normalizedProducts);
       } catch (loadError) {
         if (!isMounted) {
           return;
@@ -833,19 +808,27 @@ export default function App() {
     showToast("Produto salvo.");
   }
 
-  function saveAdminProductEditor() {
+  async function saveAdminProductEditor() {
     if (!adminProductDraft) {
       return;
     }
 
-    setEditableProducts((current) =>
-      current.map((product) =>
-        product.id === adminProductDraft.id ? cloneProduct(adminProductDraft) : product
-      )
-    );
-    setActiveAdminProductId(null);
-    setAdminProductDraft(null);
-    setAdminUploadError(null);
+    try {
+      const { items } = await updateProductRequest(cloneProduct(adminProductDraft));
+      const normalizedProducts = items.map(normalizeProduct);
+
+      setProducts(normalizedProducts);
+      setEditableProducts(normalizedProducts);
+      setActiveAdminProductId(null);
+      setAdminProductDraft(null);
+      setAdminUploadError(null);
+      showToast("Produto salvo no catálogo.");
+    } catch (error) {
+      setAdminUploadError(
+        error instanceof Error ? error.message : "Não foi possível salvar o produto."
+      );
+      showToast("Não foi possível salvar o produto.", "error");
+    }
   }
 
   async function generateAdminDraftDescription() {
@@ -876,7 +859,7 @@ export default function App() {
     }
   }
 
-  function addNewProduct() {
+  async function addNewProduct() {
     const nextId = `p-${Date.now()}`;
     const nextProduct: Product = {
       id: nextId,
@@ -886,38 +869,77 @@ export default function App() {
       category: "decor",
       material: "PLA premium",
       dimensions: "20 x 20 cm",
-      accentColor: "#11b8f5",
+      accentColor: "#ff7a00",
       imageUrl: "",
       galleryImages: [],
-      colorOptions: [{ id: "color-1", name: "Branco", swatches: ["#f8fbff"] }],
+      colorOptions: [{ id: "color-1", name: "Branco", swatches: ["#ffffff"] }],
       featured: false,
       description: "Descreva rapidamente o produto aqui.",
       tags: ["novo", "3d"]
     };
 
-    setEditableProducts((current) => [...current, nextProduct]);
-    setAdminSection("products");
-    setActiveAdminProductId(nextId);
-    setAdminProductDraft(nextProduct);
+    try {
+      const { items } = await createProduct(nextProduct);
+      const normalizedProducts = items.map(normalizeProduct);
+
+      setProducts(normalizedProducts);
+      setEditableProducts(normalizedProducts);
+      setAdminSection("products");
+      setActiveAdminProductId(nextId);
+      setAdminProductDraft(nextProduct);
+      setAdminUploadError(null);
+      showToast("Novo produto criado.");
+    } catch (error) {
+      setAdminUploadError(
+        error instanceof Error ? error.message : "Não foi possível criar o produto."
+      );
+      showToast("Não foi possível criar o produto.", "error");
+    }
   }
 
-  function removeProduct(productId: string) {
-    setEditableProducts((current) => current.filter((product) => product.id !== productId));
-    setActiveAdminProductId((current) => (current === productId ? null : current));
-    setAdminProductDraft((current) => (current?.id === productId ? null : current));
+  async function removeProduct(productId: string) {
+    try {
+      const items = await deleteProductRequest(productId);
+      const normalizedProducts = items.map(normalizeProduct);
+
+      setProducts(normalizedProducts);
+      setEditableProducts(normalizedProducts);
+      setActiveAdminProductId((current) => (current === productId ? null : current));
+      setAdminProductDraft((current) => (current?.id === productId ? null : current));
+      setAdminUploadError(null);
+      showToast("Produto deletado.");
+    } catch (error) {
+      setAdminUploadError(
+        error instanceof Error ? error.message : "Não foi possível deletar o produto."
+      );
+      showToast("Não foi possível deletar o produto.", "error");
+    }
   }
 
-  function resetAdminContent() {
+  async function resetAdminContent() {
     setSlides(defaultHeroSlides);
     setAdminSlideDrafts(defaultHeroSlides);
     setPromoCards(defaultPromoCards);
-    setEditableProducts(products);
     setActiveAdminProductId(null);
     setAdminProductDraft(null);
     setAdminUploadError(null);
     window.localStorage.removeItem("store-admin-slides");
     window.localStorage.removeItem("store-admin-promos");
     window.localStorage.removeItem("store-admin-products");
+
+    try {
+      const items = await resetProducts();
+      const normalizedProducts = items.map(normalizeProduct);
+
+      setProducts(normalizedProducts);
+      setEditableProducts(normalizedProducts);
+      showToast("Conteúdo restaurado.");
+    } catch (error) {
+      setAdminUploadError(
+        error instanceof Error ? error.message : "Não foi possível restaurar produtos."
+      );
+      showToast("Não foi possível restaurar produtos.", "error");
+    }
   }
 
   async function handleAdminImageFile(

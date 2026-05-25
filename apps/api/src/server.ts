@@ -1,4 +1,5 @@
 import cors from "@fastify/cors";
+import { neon } from "@neondatabase/serverless";
 import Fastify from "fastify";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -14,6 +15,10 @@ const server = Fastify({
 await server.register(cors, {
   origin: true
 });
+
+const databaseUrl = process.env.DATABASE_URL;
+const sql = databaseUrl ? neon(databaseUrl) : null;
+let databaseReady: Promise<void> | null = null;
 
 const ordersFilePath = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -66,6 +71,45 @@ interface StoredOrder {
   totalInCents: number;
 }
 
+type JsonRow<T> = {
+  data: T;
+};
+
+async function ensureDatabase() {
+  if (!sql) {
+    return;
+  }
+
+  databaseReady ??= (async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS products (
+        id TEXT PRIMARY KEY,
+        data JSONB NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0
+      )
+    `;
+    await sql`
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS orders (
+        id TEXT PRIMARY KEY,
+        data JSONB NOT NULL
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        data JSONB NOT NULL
+      )
+    `;
+  })();
+
+  await databaseReady;
+}
+
 function hashPassword(password: string, salt: string) {
   return createHash("sha256").update(`${salt}:${password}`).digest("hex");
 }
@@ -94,6 +138,21 @@ function createDefaultAdminUser(): StoredUser {
 }
 
 async function readUsers() {
+  if (sql) {
+    await ensureDatabase();
+    const rows = (await sql`
+      SELECT data FROM users ORDER BY id
+    `) as Array<JsonRow<StoredUser>>;
+
+    if (rows.length > 0) {
+      return rows.map((row) => row.data);
+    }
+
+    const defaultUsers = [createDefaultAdminUser()];
+    await saveUsers(defaultUsers);
+    return defaultUsers;
+  }
+
   try {
     const content = await readFile(usersFilePath, "utf8");
     const storedUsers = JSON.parse(content) as StoredUser[];
@@ -111,11 +170,37 @@ async function readUsers() {
 }
 
 async function saveUsers(users: StoredUser[]) {
+  if (sql) {
+    await ensureDatabase();
+    await sql`DELETE FROM users`;
+
+    for (const user of users) {
+      await sql`
+        INSERT INTO users (id, email, data)
+        VALUES (${user.id}, ${user.email.toLowerCase()}, ${JSON.stringify(user)}::jsonb)
+        ON CONFLICT (id) DO UPDATE SET
+          email = EXCLUDED.email,
+          data = EXCLUDED.data
+      `;
+    }
+
+    return;
+  }
+
   await mkdir(dirname(usersFilePath), { recursive: true });
   await writeFile(usersFilePath, JSON.stringify(users, null, 2));
 }
 
 async function readOrders() {
+  if (sql) {
+    await ensureDatabase();
+    const rows = (await sql`
+      SELECT data FROM orders ORDER BY data->>'createdAt' DESC
+    `) as Array<JsonRow<StoredOrder>>;
+
+    return rows.map((row) => row.data);
+  }
+
   try {
     const content = await readFile(ordersFilePath, "utf8");
     return JSON.parse(content) as StoredOrder[];
@@ -125,11 +210,40 @@ async function readOrders() {
 }
 
 async function saveOrders(orders: StoredOrder[]) {
+  if (sql) {
+    await ensureDatabase();
+    await sql`DELETE FROM orders`;
+
+    for (const order of orders) {
+      await sql`
+        INSERT INTO orders (id, data)
+        VALUES (${order.id}, ${JSON.stringify(order)}::jsonb)
+        ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data
+      `;
+    }
+
+    return;
+  }
+
   await mkdir(dirname(ordersFilePath), { recursive: true });
   await writeFile(ordersFilePath, JSON.stringify(orders, null, 2));
 }
 
 async function readCatalogProducts() {
+  if (sql) {
+    await ensureDatabase();
+    const rows = (await sql`
+      SELECT data FROM products ORDER BY sort_order ASC, id ASC
+    `) as Array<JsonRow<Product>>;
+
+    if (rows.length > 0) {
+      return rows.map((row) => row.data);
+    }
+
+    await saveCatalogProducts(products);
+    return products;
+  }
+
   try {
     const content = await readFile(productsFilePath, "utf8");
     const storedProducts = JSON.parse(content) as Product[];
@@ -145,6 +259,23 @@ async function readCatalogProducts() {
 }
 
 async function saveCatalogProducts(nextProducts: Product[]) {
+  if (sql) {
+    await ensureDatabase();
+    await sql`DELETE FROM products`;
+
+    for (const [index, product] of nextProducts.entries()) {
+      await sql`
+        INSERT INTO products (id, data, sort_order)
+        VALUES (${product.id}, ${JSON.stringify(product)}::jsonb, ${index})
+        ON CONFLICT (id) DO UPDATE SET
+          data = EXCLUDED.data,
+          sort_order = EXCLUDED.sort_order
+      `;
+    }
+
+    return;
+  }
+
   await mkdir(dirname(productsFilePath), { recursive: true });
   await writeFile(productsFilePath, JSON.stringify(nextProducts, null, 2));
 }

@@ -40,11 +40,24 @@ npm run dev:web
 
 ## Variáveis
 
+Crie um `.env` local a partir de `.env.example`.
+
+No backend, configure o Neon com:
+
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/dbname?sslmode=require"
+```
+
+Sem `DATABASE_URL`, a API usa arquivos JSON locais apenas para desenvolvimento.
+
 No frontend, você pode apontar a API com:
 
 ```bash
 VITE_API_URL=http://127.0.0.1:4020
 ```
+
+Para Vercel, configure `VITE_API_URL` com a URL pública da API e mantenha
+`DATABASE_URL` no ambiente onde a API estiver rodando.
 
 ## Rotas da API
 
@@ -52,11 +65,14 @@ VITE_API_URL=http://127.0.0.1:4020
 - `GET /api/categories`
 - `GET /api/products`
 - `GET /api/products/:slug`
+- `POST /api/products`
+- `PUT /api/products/:id`
+- `DELETE /api/products/:id`
+- `POST /api/orders`
 
 ## Próximos passos recomendados
 
-- Adicionar banco com PostgreSQL + Prisma
-- Criar autenticação para painel administrativo
+- Criar deploy da API em ambiente Node persistente ou serverless
 - Persistir carrinho e favoritos
 - Integrar pagamentos com Stripe ou Mercado Pago
 - Subir assets reais dos produtos 3D e galeria por variante

@@ -491,6 +491,10 @@ button {
   margin: 0 auto;
 }
 
+.marketplace-content {
+  width: min(1458px, calc(100% - 2rem));
+}
+
 .top-header-inner {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr) auto;
@@ -1497,32 +1501,37 @@ button {
 
 .product-list {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1rem;
 }
 
 .product-row {
+  position: relative;
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr) 220px;
-  gap: 1rem;
-  padding: 1rem;
-  border-left: 0;
-  border-right: 0;
-  border-top: 0;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
 }
 
 .product-row:last-child {
-  border-bottom: 0;
+  border-bottom: 1px solid var(--line);
 }
 
 .product-thumb {
   position: relative;
-  aspect-ratio: 1 / 1;
-  border-radius: 0.75rem;
+  min-height: 17rem;
+  border-radius: 0;
   background:
     radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.96), transparent 12%),
     radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--accent) 72%, white), transparent 38%),
     var(--surface-soft);
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 0;
+  border-bottom: 1px solid var(--line);
   padding: 0;
 }
 
@@ -1531,17 +1540,18 @@ button {
   background: var(--surface);
 }
 
-.product-thumb span {
+.product-offer-badge {
   position: absolute;
-  left: 0.75rem;
-  top: 0.75rem;
-  border-radius: 999px;
-  background: var(--surface);
-  padding: 0.3rem 0.55rem;
-  color: var(--muted);
-  font-size: 0.72rem;
-  text-transform: capitalize;
-  border: 1px solid var(--line);
+  left: 0.85rem;
+  bottom: 0.85rem;
+  border-radius: 0.25rem;
+  background: var(--brand);
+  padding: 0.32rem 0.55rem;
+  color: var(--brand-contrast);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .product-glow {
@@ -1560,6 +1570,35 @@ button {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  padding: 0.75rem;
+}
+
+.product-favorite-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: var(--brand);
+  font-size: 1.45rem;
+  line-height: 1;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+.product-favorite-button.active {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.product-info {
+  display: grid;
+  align-content: start;
   padding: 1rem;
 }
 
@@ -1580,8 +1619,14 @@ button {
 
 .product-title-row h3 {
   margin: 0;
-  font-size: 1.35rem;
+  display: -webkit-box;
+  overflow: hidden;
+  min-height: 2.75rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 1.08rem;
   font-weight: 400;
+  line-height: 1.28;
 }
 
 .seller-badge {
@@ -1609,13 +1654,13 @@ button {
   display: flex;
   gap: 0.35rem;
   align-items: center;
-  margin-top: 0.8rem;
+  margin-top: 0.65rem;
   color: var(--brand);
   font-size: 0.92rem;
 }
 
-.rating-score {
-  font-weight: 600;
+.rating-star {
+  color: var(--brand);
 }
 
 .tag-row {
@@ -1653,6 +1698,7 @@ button {
   display: grid;
   align-content: start;
   gap: 0.35rem;
+  margin-top: 0.7rem;
 }
 
 .buy-box strong {
@@ -3659,9 +3705,12 @@ button {
 
 @media (max-width: 1100px) {
   .promo-strip,
-  .results-shell,
-  .product-row {
+  .results-shell {
     grid-template-columns: 1fr;
+  }
+
+  .product-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .product-page {
@@ -3691,9 +3740,6 @@ button {
     position: static;
   }
 
-  .product-row {
-    gap: 0.9rem;
-  }
 }
 
 @media (max-width: 860px) {
@@ -3757,6 +3803,10 @@ button {
     align-items: stretch;
   }
 
+  .product-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .summary-actions {
     flex-direction: column;
     align-items: stretch;
@@ -3776,6 +3826,11 @@ button {
 
   .product-thumb {
     min-height: 150px;
+  }
+
+  .product-list {
+    grid-template-columns: 1fr;
+    padding: 0.75rem;
   }
 
   .hero-slide {

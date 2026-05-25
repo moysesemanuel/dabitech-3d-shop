@@ -2100,7 +2100,6 @@ export default function App() {
               onChangeSortBy={setSortBy}
               onOpenProduct={openProductPage}
               onToggleFavorite={toggleFavorite}
-              onAddToCart={addToCart}
               onResetStorefront={resetStorefront}
             />
             <StoreFooter />

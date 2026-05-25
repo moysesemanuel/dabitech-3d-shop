@@ -25,7 +25,6 @@ interface StorefrontContentProps {
   onChangeSortBy: (sortBy: SortOption) => void;
   onOpenProduct: (product: Product) => void;
   onToggleFavorite: (productId: string) => void;
-  onAddToCart: (productId: string) => void;
   onResetStorefront: () => void;
 }
 
@@ -47,7 +46,6 @@ export function StorefrontContent({
   onChangeSortBy,
   onOpenProduct,
   onToggleFavorite,
-  onAddToCart,
   onResetStorefront
 }: StorefrontContentProps) {
   return (
@@ -84,7 +82,6 @@ export function StorefrontContent({
             favoriteIds={favoriteIds}
             onOpenProduct={onOpenProduct}
             onToggleFavorite={onToggleFavorite}
-            onAddToCart={onAddToCart}
             onResetStorefront={onResetStorefront}
           />
         </section>

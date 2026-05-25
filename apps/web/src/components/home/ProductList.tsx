@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Product } from "../../types";
-import { buildInstallment, formatCurrency } from "../../lib/currency";
+import { formatCurrency } from "../../lib/currency";
 import { buildRating, buildReviewCount } from "../../lib/product";
 
 type HeaderView = "all" | "offers" | "favorites";
@@ -13,7 +13,6 @@ interface ProductListProps {
   favoriteIds: string[];
   onOpenProduct: (product: Product) => void;
   onToggleFavorite: (productId: string) => void;
-  onAddToCart: (productId: string) => void;
   onResetStorefront: () => void;
 }
 
@@ -25,7 +24,6 @@ export function ProductList({
   favoriteIds,
   onOpenProduct,
   onToggleFavorite,
-  onAddToCart,
   onResetStorefront
 }: ProductListProps) {
   return (
@@ -57,7 +55,26 @@ export function ProductList({
                   <div className="product-glow" />
                 )}
 
-                <span>{product.featured ? "novo" : product.category}</span>
+                {product.featured ? (
+                  <span className="product-offer-badge">Oferta imperdível</span>
+                ) : null}
+              </button>
+
+              <button
+                className={
+                  favoriteIds.includes(product.id)
+                    ? "product-favorite-button active"
+                    : "product-favorite-button"
+                }
+                type="button"
+                aria-label={
+                  favoriteIds.includes(product.id)
+                    ? "Remover dos favoritos"
+                    : "Adicionar aos favoritos"
+                }
+                onClick={() => onToggleFavorite(product.id)}
+              >
+                ♡
               </button>
 
               <div className="product-info">
@@ -69,64 +86,17 @@ export function ProductList({
                   >
                     <h3>{product.name}</h3>
                   </button>
-
-                  {product.featured ? (
-                    <span className="seller-badge">Loja oficial</span>
-                  ) : null}
                 </div>
-
-                <p className="product-description">{product.description}</p>
 
                 <div className="rating-row">
+                  <span className="rating-star">★</span>
                   <span className="rating-score">{buildRating(index)}</span>
-                  <span className="rating-stars">★★★★★</span>
-                  <span className="rating-count">({buildReviewCount(index)})</span>
+                  <span className="rating-count">| +{buildReviewCount(index)} vendidos</span>
                 </div>
 
-                <div className="tag-row">
-                  {product.tags.map((tag) => (
-                    <span key={tag}>{tag}</span>
-                  ))}
+                <div className="buy-box">
+                  <strong>{formatCurrency(product.priceInCents)}</strong>
                 </div>
-
-                <div className="meta-row">
-                  <span>{product.material}</span>
-                  <span>{product.dimensions}</span>
-                </div>
-
-                <div className="product-actions">
-                  <button
-                    className="ghost-action"
-                    type="button"
-                    onClick={() => onOpenProduct(product)}
-                  >
-                    Ver detalhes
-                  </button>
-
-                  <button
-                    className={
-                      favoriteIds.includes(product.id)
-                        ? "ghost-action active-ghost"
-                        : "ghost-action"
-                    }
-                    type="button"
-                    onClick={() => onToggleFavorite(product.id)}
-                  >
-                    {favoriteIds.includes(product.id)
-                      ? "Remover dos favoritos"
-                      : "Salvar"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="buy-box">
-                <strong>{formatCurrency(product.priceInCents)}</strong>
-                <small>{buildInstallment(product.priceInCents)}</small>
-                <span className="shipping-badge">Frete grátis</span>
-
-                <button type="button" onClick={() => onAddToCart(product.id)}>
-                  Adicionar ao carrinho
-                </button>
               </div>
             </article>
           ))}

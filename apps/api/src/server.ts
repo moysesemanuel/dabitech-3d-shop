@@ -12,7 +12,7 @@ export const server = Fastify({
   logger: true
 });
 
-await server.register(cors, {
+server.register(cors, {
   origin: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["content-type", "authorization"]

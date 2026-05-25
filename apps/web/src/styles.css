@@ -1938,53 +1938,243 @@ button {
 }
 
 .admin-page {
-  width: min(1240px, calc(100% - 2rem));
-  margin: 0 auto;
-  padding: 1.5rem 0 2rem;
+  width: 100%;
+  min-height: 100vh;
+  padding: 0 0 2rem 280px;
 }
 
-.admin-page-header {
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 18;
+  display: grid;
+  grid-template-columns: 190px minmax(280px, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  min-height: 72px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(14px);
+  padding: 0.75rem 1.5rem;
+}
+
+.admin-topbar-logo {
+  border: 0;
+  background: transparent;
+}
+
+.admin-logo-image {
+  display: block;
+  width: 142px;
+}
+
+.admin-search-shell {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: center;
+  width: min(620px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+
+.admin-search-shell select {
+  height: 2.75rem;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  padding: 0 0.8rem;
+  outline: none;
+}
+
+.admin-searchbar {
+  position: relative;
+}
+
+.admin-searchbar input {
+  width: 100%;
+  height: 2.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0 2.8rem 0 0.9rem;
+  outline: none;
+}
+
+.admin-topbar-actions {
   display: flex;
-  justify-content: space-between;
-  gap: 1.5rem;
-  align-items: start;
-  margin-bottom: 1rem;
+  gap: 0.65rem;
+  align-items: center;
 }
 
-.admin-page-header h1,
+.admin-icon-button,
+.admin-news-button,
+.admin-profile-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.55rem;
+  height: 2.55rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.admin-icon-button svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.admin-icon-button span,
+.admin-news-button span {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.2rem;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--brand-contrast);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.admin-news-button {
+  display: inline-flex;
+  gap: 0.45rem;
+  padding: 0 0.95rem;
+  font-weight: 500;
+}
+
+.admin-profile-button span {
+  display: inline-grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.admin-profile-shell {
+  position: relative;
+}
+
+.admin-profile-dropdown {
+  position: absolute;
+  top: calc(100% + 0.65rem);
+  right: 0;
+  z-index: 30;
+  width: min(360px, calc(100vw - 1rem));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+}
+
+.admin-profile-dropdown section {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.15rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-profile-dropdown section:last-child {
+  border-bottom: 0;
+}
+
+.admin-profile-dropdown h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.admin-profile-dropdown button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0;
+  text-align: left;
+  font-weight: 500;
+}
+
+.admin-profile-store-button {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 0.85rem !important;
+  background: var(--surface) !important;
+  padding: 1rem !important;
+  font-size: 1.15rem;
+}
+
+.admin-profile-store-button svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.admin-theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.admin-theme-options button {
+  padding: 0.7rem !important;
+  text-align: center !important;
+}
+
+.admin-theme-options .is-active {
+  box-shadow: inset 0 0 0 1px var(--brand);
+  color: var(--brand);
+}
+
 .admin-page-panel-header h2 {
   margin: 0.35rem 0 0;
 }
 
-.admin-page-header p {
-  max-width: 56ch;
-  margin: 0.75rem 0 0;
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-.admin-page-header-actions {
-  display: flex;
-  gap: 0.8rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
 .admin-page-layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
+  padding: 1.25rem;
 }
 
 .admin-sidebar {
-  position: sticky;
-  top: 1rem;
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 19;
+  width: 280px;
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  padding: 1rem 0.75rem;
 }
 
 .admin-sidebar-card {
   display: grid;
   gap: 1rem;
+}
+
+.admin-sidebar-card h2 {
+  margin: 0.4rem 0.45rem 0.6rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .admin-menu {
@@ -1993,8 +2183,7 @@ button {
 }
 
 .admin-menu-group {
-  border: 1px solid transparent;
-  border-radius: 0.8rem;
+  border-radius: 0.75rem;
 }
 
 .admin-menu-heading {
@@ -2017,7 +2206,8 @@ button {
 
 .admin-menu-heading span:last-child {
   color: var(--muted);
-  transition: transform 160ms ease, color 160ms ease;
+  opacity: 0;
+  transition: transform 160ms ease, color 160ms ease, opacity 160ms ease;
 }
 
 .admin-submenu {
@@ -2030,14 +2220,11 @@ button {
   transition: max-height 180ms ease, opacity 180ms ease, padding 180ms ease;
 }
 
-.admin-sidebar:hover .admin-menu-group,
-.admin-menu-group:focus-within {
-  border-color: var(--line);
+.admin-menu-group.is-open {
   background: var(--surface-soft);
 }
 
-.admin-sidebar:hover .admin-submenu,
-.admin-menu-group:focus-within .admin-submenu {
+.admin-menu-group.is-open .admin-submenu {
   max-height: 34rem;
   opacity: 1;
   padding: 0.25rem 0.35rem 0.55rem;
@@ -2045,6 +2232,10 @@ button {
 
 .admin-sidebar:hover .admin-menu-heading span:last-child,
 .admin-menu-group:focus-within .admin-menu-heading span:last-child {
+  opacity: 1;
+}
+
+.admin-menu-group.is-open .admin-menu-heading span:last-child {
   color: var(--brand);
   transform: rotate(180deg);
 }

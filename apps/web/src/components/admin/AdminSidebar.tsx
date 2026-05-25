@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { adminMenuGroups, type AdminSection } from "./adminSections";
 
 interface AdminSidebarProps {
@@ -13,16 +15,37 @@ export function AdminSidebar({
   onResetStorefront,
   onAddNewProduct
 }: AdminSidebarProps) {
+  const [openGroups, setOpenGroups] = useState<string[]>(["Produtos"]);
+
+  function toggleGroup(groupTitle: string) {
+    setOpenGroups((current) =>
+      current.includes(groupTitle)
+        ? current.filter((title) => title !== groupTitle)
+        : [...current, groupTitle]
+    );
+  }
+
   return (
     <aside className="admin-sidebar">
-      <div className="filter-card admin-sidebar-card">
+      <div className="admin-sidebar-card">
         <h2>Administração</h2>
         <div className="admin-menu">
           {adminMenuGroups.map((group) => (
-            <section key={group.title} className="admin-menu-group">
-              <button className="admin-menu-heading" type="button">
+            <section
+              key={group.title}
+              className={
+                openGroups.includes(group.title)
+                  ? "admin-menu-group is-open"
+                  : "admin-menu-group"
+              }
+            >
+              <button
+                className="admin-menu-heading"
+                type="button"
+                onClick={() => toggleGroup(group.title)}
+              >
                 <span>{group.title}</span>
-                <span aria-hidden="true">▾</span>
+                <span className="admin-menu-arrow" aria-hidden="true">▾</span>
               </button>
 
               <div className="admin-submenu">

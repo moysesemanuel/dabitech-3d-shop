@@ -9,6 +9,7 @@ export interface Product {
   name: string;
   slug: string;
   priceInCents: number;
+  compareAtPriceInCents?: number;
   category: ProductCategory;
   material: string;
   dimensions: string;

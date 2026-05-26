@@ -93,6 +93,22 @@ export function AdminProductEditor({
             </label>
 
             <label>
+              <span>Preço antigo</span>
+              <input
+                inputMode="numeric"
+                value={
+                  product.compareAtPriceInCents
+                    ? formatCurrency(product.compareAtPriceInCents)
+                    : ""
+                }
+                onChange={(event) =>
+                  onUpdateAdminProductDraft("compareAtPriceInCents", event.target.value)
+                }
+                placeholder="Maior que o preço atual"
+              />
+            </label>
+
+            <label>
               <span>Situação</span>
               <select value="active" onChange={() => undefined}>
                 <option value="active">Ativo</option>

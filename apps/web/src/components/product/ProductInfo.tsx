@@ -1,6 +1,6 @@
 import type { Product, ProductColorOption } from "../../types";
 import { buildInstallment, formatCurrency } from "../../lib/currency";
-import { buildRating, buildReviewCount } from "../../lib/product";
+import { buildRating, buildReviewCount, getValidCompareAtPrice } from "../../lib/product";
 
 interface ProductInfoProps {
   product: Product;
@@ -19,6 +19,8 @@ export function ProductInfo({
   featureBullets,
   onSelectColorOption
 }: ProductInfoProps) {
+  const compareAtPrice = getValidCompareAtPrice(product);
+
   return (
     <div className="product-page-info">
       <span className="product-page-kicker">
@@ -35,6 +37,11 @@ export function ProductInfo({
       </div>
 
       <div className="product-page-price">
+        {compareAtPrice ? (
+          <span className="product-old-price product-page-old-price">
+            {formatCurrency(compareAtPrice)}
+          </span>
+        ) : null}
         <strong>{formatCurrency(product.priceInCents)}</strong>
         <small>{buildInstallment(product.priceInCents)}</small>
         <span className="shipping-badge">Frete grátis</span>

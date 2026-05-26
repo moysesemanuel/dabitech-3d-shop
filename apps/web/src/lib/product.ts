@@ -8,9 +8,22 @@ export function buildReviewCount(index: number) {
   return 18 + index * 7;
 }
 
+export function getValidCompareAtPrice(product: Product) {
+  return typeof product.compareAtPriceInCents === "number" &&
+    Number.isFinite(product.compareAtPriceInCents) &&
+    product.compareAtPriceInCents > product.priceInCents
+    ? product.compareAtPriceInCents
+    : null;
+}
+
 export function normalizeProduct(product: Product): Product {
   return {
     ...product,
+    compareAtPriceInCents:
+      typeof product.compareAtPriceInCents === "number" &&
+      Number.isFinite(product.compareAtPriceInCents)
+        ? product.compareAtPriceInCents
+        : undefined,
     imageUrl: product.imageUrl ?? "",
     galleryImages: Array.isArray(product.galleryImages) ? product.galleryImages : [],
     colorOptions: Array.isArray(product.colorOptions) ? product.colorOptions : []

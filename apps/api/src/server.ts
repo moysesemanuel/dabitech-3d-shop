@@ -296,6 +296,13 @@ function isProductPayload(value: unknown): value is Product {
     isFilledString(product.name) &&
     isFilledString(product.slug) &&
     Number.isFinite(product.priceInCents) &&
+    (
+      product.compareAtPriceInCents === undefined ||
+      (
+        Number.isFinite(product.compareAtPriceInCents) &&
+        product.compareAtPriceInCents > product.priceInCents
+      )
+    ) &&
     isFilledString(product.category) &&
     isFilledString(product.material) &&
     isFilledString(product.dimensions) &&

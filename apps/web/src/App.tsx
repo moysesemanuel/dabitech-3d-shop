@@ -728,9 +728,15 @@ export default function App() {
           return { ...product, featured: value };
         }
 
-        if (field === "priceInCents" && typeof value === "string") {
+        if (
+          (field === "priceInCents" || field === "compareAtPriceInCents") &&
+          typeof value === "string"
+        ) {
           const normalized = Number(value.replace(/[^\d]/g, ""));
-          return { ...product, priceInCents: normalized };
+          return {
+            ...product,
+            [field]: normalized > 0 ? normalized : undefined
+          } as Product;
         }
 
         if (field === "tags" && typeof value === "string") {
@@ -758,9 +764,15 @@ export default function App() {
         return { ...current, featured: value };
       }
 
-      if (field === "priceInCents" && typeof value === "string") {
+      if (
+        (field === "priceInCents" || field === "compareAtPriceInCents") &&
+        typeof value === "string"
+      ) {
         const normalized = Number(value.replace(/[^\d]/g, ""));
-        return { ...current, priceInCents: normalized };
+        return {
+          ...current,
+          [field]: normalized > 0 ? normalized : undefined
+        } as Product;
       }
 
       if (field === "tags" && typeof value === "string") {
@@ -891,7 +903,16 @@ export default function App() {
     }
 
     try {
-      const { items } = await updateProductRequest(cloneProduct(adminProductDraft));
+      const nextProduct = cloneProduct(adminProductDraft);
+
+      if (
+        typeof nextProduct.compareAtPriceInCents !== "number" ||
+        nextProduct.compareAtPriceInCents <= nextProduct.priceInCents
+      ) {
+        delete nextProduct.compareAtPriceInCents;
+      }
+
+      const { items } = await updateProductRequest(nextProduct);
       const normalizedProducts = items.map(normalizeProduct);
 
       setProducts(normalizedProducts);

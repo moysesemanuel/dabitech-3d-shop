@@ -956,6 +956,17 @@ button {
   font-weight: 500;
 }
 
+.product-old-price {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1;
+  text-decoration: line-through;
+}
+
+.product-page-old-price {
+  font-size: 1.05rem;
+}
+
 .product-page-description {
   margin: 1.2rem 0 0;
   color: var(--muted);

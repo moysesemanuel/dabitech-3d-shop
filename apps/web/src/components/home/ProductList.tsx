@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Product } from "../../types";
 import { formatCurrency } from "../../lib/currency";
-import { buildRating, buildReviewCount } from "../../lib/product";
+import { buildRating, buildReviewCount, getValidCompareAtPrice } from "../../lib/product";
 
 type HeaderView = "all" | "offers" | "favorites";
 
@@ -34,12 +34,15 @@ export function ProductList({
 
       {!isLoading && !error ? (
         <div className="product-list">
-          {products.map((product, index) => (
-            <article
-              key={product.id}
-              className="product-row"
-              style={{ "--accent": product.accentColor } as CSSProperties}
-            >
+          {products.map((product, index) => {
+            const compareAtPrice = getValidCompareAtPrice(product);
+
+            return (
+              <article
+                key={product.id}
+                className="product-row"
+                style={{ "--accent": product.accentColor } as CSSProperties}
+              >
               <button
                 className={product.imageUrl ? "product-thumb has-image" : "product-thumb"}
                 type="button"
@@ -95,11 +98,17 @@ export function ProductList({
                 </div>
 
                 <div className="buy-box">
+                  {compareAtPrice ? (
+                    <span className="product-old-price">
+                      {formatCurrency(compareAtPrice)}
+                    </span>
+                  ) : null}
                   <strong>{formatCurrency(product.priceInCents)}</strong>
                 </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       ) : null}
 

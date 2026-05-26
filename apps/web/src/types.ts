@@ -45,6 +45,7 @@ export interface CheckoutAddress {
 export interface CreateOrderPayload {
   customer: CheckoutCustomer;
   address: CheckoutAddress;
+  deliveryMethod: "delivery" | "pickup" | "combine";
   paymentMethod: "pix" | "whatsapp";
   items: Array<{
     productId: string;
@@ -54,7 +55,8 @@ export interface CreateOrderPayload {
 
 export interface Order {
   id: string;
-  status: "pending_payment";
+  status: "pending_payment" | "paid" | "in_production" | "shipped" | "delivered" | "cancelled";
+  deliveryMethod: "delivery" | "pickup" | "combine";
   paymentMethod: "pix" | "whatsapp";
   createdAt: string;
   customer: CheckoutCustomer;

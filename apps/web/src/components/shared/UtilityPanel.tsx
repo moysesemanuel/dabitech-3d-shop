@@ -1,3 +1,6 @@
+import type { Order } from "../../types";
+import { formatCurrency } from "../../lib/currency";
+
 type UtilityPanelType = "coupons" | "orders" | "contact";
 
 interface Coupon {
@@ -5,23 +8,36 @@ interface Coupon {
   description: string;
 }
 
-interface Order {
-  id: string;
-  status: string;
-  product: string;
-}
-
 interface UtilityPanelProps {
   activePanel: UtilityPanelType;
   coupons: Coupon[];
   orders: Order[];
+  isLoadingOrders?: boolean;
+  ordersError?: string | null;
+  onRefreshOrders?: () => void | Promise<void>;
   onClose: () => void;
+}
+
+function formatOrderStatus(status: Order["status"]) {
+  const labels: Record<Order["status"], string> = {
+    pending_payment: "Aguardando pagamento",
+    paid: "Pago",
+    in_production: "Em produção",
+    shipped: "Enviado",
+    delivered: "Entregue",
+    cancelled: "Cancelado"
+  };
+
+  return labels[status];
 }
 
 export function UtilityPanel({
   activePanel,
   coupons,
   orders,
+  isLoadingOrders = false,
+  ordersError = null,
+  onRefreshOrders,
   onClose
 }: UtilityPanelProps) {
   const panelKicker =
@@ -71,11 +87,30 @@ export function UtilityPanel({
 
         {activePanel === "orders" ? (
           <div className="utility-list">
+            <button
+              className="ghost-action"
+              type="button"
+              onClick={onRefreshOrders}
+              disabled={isLoadingOrders}
+            >
+              {isLoadingOrders ? "Atualizando..." : "Atualizar compras"}
+            </button>
+
+            {ordersError ? <p className="admin-upload-error">{ordersError}</p> : null}
+
+            {!isLoadingOrders && orders.length === 0 ? (
+              <article className="utility-card">
+                <strong>Nenhuma compra encontrada.</strong>
+                <p>Quando você finalizar um pedido, ele aparecerá aqui.</p>
+              </article>
+            ) : null}
+
             {orders.map((order) => (
               <article key={order.id} className="utility-card">
-                <strong>{order.product}</strong>
-                <p>{order.id}</p>
-                <span>{order.status}</span>
+                <strong>{order.id}</strong>
+                <p>{order.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}</p>
+                <span>{formatOrderStatus(order.status)}</span>
+                <span>{formatCurrency(order.totalInCents)}</span>
               </article>
             ))}
           </div>

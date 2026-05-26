@@ -5,6 +5,7 @@ import { formatCurrency } from "../../lib/currency";
 import { formatColorOptions, parseDimensions } from "../../lib/product";
 
 interface AdminProductEditorProps {
+  mode: "create" | "edit";
   product: Product;
   categories: Category[];
   isGeneratingAdminDescription: boolean;
@@ -21,6 +22,7 @@ interface AdminProductEditorProps {
 }
 
 export function AdminProductEditor({
+  mode,
   product,
   categories,
   isGeneratingAdminDescription,
@@ -36,6 +38,8 @@ export function AdminProductEditor({
   onSaveAdminProductEditor
 }: AdminProductEditorProps) {
   const dimensions = parseDimensions(product.dimensions);
+  const formTitle = mode === "create" ? "Criar produto" : "Editar produto";
+  const saveLabel = mode === "create" ? "Criar produto" : "Salvar alterações";
   const categoryLabel =
     categories.find((category) => category.id === product.category)?.label ?? product.category;
 
@@ -48,7 +52,7 @@ export function AdminProductEditor({
     <div className="admin-product-editor product-form-editor">
       <div className="product-form-topbar">
         <button className="product-form-back" type="button" onClick={onCancelAdminProductEditor}>
-          &lt; Produtos / Editar produto
+          &lt; Produtos / {formTitle}
         </button>
         <span>Salvo neste navegador</span>
       </div>
@@ -460,7 +464,7 @@ export function AdminProductEditor({
           Cancelar
         </button>
         <button className="admin-primary-action" type="button" onClick={onSaveAdminProductEditor}>
-          Salvar alterações
+          {saveLabel}
         </button>
       </div>
     </div>

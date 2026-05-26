@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import { neon } from "@neondatabase/serverless";
 import Fastify from "fastify";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,7 @@ server.register(cors, {
 });
 
 const databaseUrl = process.env.DATABASE_URL;
+const authSecret = process.env.AUTH_SECRET ?? "dev-dabi-tech-3d-secret";
 const sql = databaseUrl ? neon(databaseUrl) : null;
 let databaseReady: Promise<void> | null = null;
 
@@ -34,6 +35,10 @@ const usersFilePath = join(
   dirname(fileURLToPath(import.meta.url)),
   "../src/data/users.json"
 );
+const storefrontFilePath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../src/data/storefront.json"
+);
 
 interface StoredUser {
   id: string;
@@ -47,7 +52,8 @@ interface StoredUser {
 
 interface StoredOrder {
   id: string;
-  status: "pending_payment";
+  status: "pending_payment" | "paid" | "in_production" | "shipped" | "delivered" | "cancelled";
+  deliveryMethod: "delivery" | "pickup" | "combine";
   paymentMethod: "pix" | "whatsapp";
   createdAt: string;
   customer: {
@@ -71,6 +77,12 @@ interface StoredOrder {
     subtotalInCents: number;
   }>;
   totalInCents: number;
+}
+
+interface StoredStorefront {
+  slides: unknown[];
+  promoCards: unknown[];
+  updatedAt: string;
 }
 
 type JsonRow<T> = {
@@ -107,6 +119,12 @@ async function ensureDatabase() {
         data JSONB NOT NULL
       )
     `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        data JSONB NOT NULL
+      )
+    `;
   })();
 
   await databaseReady;
@@ -123,6 +141,50 @@ function sanitizeUser(user: StoredUser) {
     email: user.email,
     role: user.role
   };
+}
+
+function createAuthToken(user: StoredUser) {
+  const issuedAt = Date.now();
+  const payload = `${user.id}.${user.role}.${issuedAt}`;
+  const signature = createHmac("sha256", authSecret).update(payload).digest("hex");
+
+  return `${payload}.${signature}`;
+}
+
+async function getAuthenticatedUser(request: { headers: Record<string, unknown> }) {
+  const authorization = request.headers.authorization;
+
+  if (typeof authorization !== "string" || !authorization.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const token = authorization.slice("Bearer ".length);
+  const [id, role, issuedAt, signature] = token.split(".");
+
+  if (!id || !role || !issuedAt || !signature) {
+    return null;
+  }
+
+  const payload = `${id}.${role}.${issuedAt}`;
+  const expectedSignature = createHmac("sha256", authSecret).update(payload).digest("hex");
+
+  if (signature !== expectedSignature) {
+    return null;
+  }
+
+  const users = await readUsers();
+  return users.find((user) => user.id === id && user.role === role) ?? null;
+}
+
+async function requireAdmin(request: { headers: Record<string, unknown> }, reply: { status: (code: number) => void }) {
+  const user = await getAuthenticatedUser(request);
+
+  if (!user || user.role !== "admin") {
+    reply.status(403);
+    return null;
+  }
+
+  return user;
 }
 
 function createDefaultAdminUser(): StoredUser {
@@ -229,6 +291,65 @@ async function saveOrders(orders: StoredOrder[]) {
 
   await mkdir(dirname(ordersFilePath), { recursive: true });
   await writeFile(ordersFilePath, JSON.stringify(orders, null, 2));
+}
+
+async function saveOrder(order: StoredOrder) {
+  if (sql) {
+    await ensureDatabase();
+    await sql`
+      INSERT INTO orders (id, data)
+      VALUES (${order.id}, ${JSON.stringify(order)}::jsonb)
+      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data
+    `;
+
+    return;
+  }
+
+  const orders = await readOrders();
+  const nextOrders = [order, ...orders.filter((item) => item.id !== order.id)];
+  await saveOrders(nextOrders);
+}
+
+async function readStorefront(): Promise<StoredStorefront> {
+  if (sql) {
+    await ensureDatabase();
+    const rows = (await sql`
+      SELECT data FROM settings WHERE key = 'storefront'
+    `) as Array<JsonRow<StoredStorefront>>;
+
+    if (rows[0]?.data) {
+      return rows[0].data;
+    }
+  } else {
+    try {
+      const content = await readFile(storefrontFilePath, "utf8");
+      return JSON.parse(content) as StoredStorefront;
+    } catch {
+      // Return empty settings below.
+    }
+  }
+
+  return {
+    slides: [],
+    promoCards: [],
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function saveStorefront(storefront: StoredStorefront) {
+  if (sql) {
+    await ensureDatabase();
+    await sql`
+      INSERT INTO settings (key, data)
+      VALUES ('storefront', ${JSON.stringify(storefront)}::jsonb)
+      ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
+    `;
+
+    return;
+  }
+
+  await mkdir(dirname(storefrontFilePath), { recursive: true });
+  await writeFile(storefrontFilePath, JSON.stringify(storefront, null, 2));
 }
 
 async function readCatalogProducts() {
@@ -358,7 +479,7 @@ server.post("/api/auth/login", async (request, reply) => {
   }
 
   return {
-    token: `local-${user.id}-${Date.now()}`,
+    token: createAuthToken(user),
     user: sanitizeUser(user)
   };
 });
@@ -412,9 +533,43 @@ server.post("/api/auth/register", async (request, reply) => {
 
   reply.status(201);
   return {
-    token: `local-${user.id}-${Date.now()}`,
+    token: createAuthToken(user),
     user: sanitizeUser(user)
   };
+});
+
+server.get("/api/storefront", async () => {
+  const storefront = await readStorefront();
+
+  return storefront;
+});
+
+server.put("/api/storefront", async (request, reply) => {
+  const admin = await requireAdmin(request, reply);
+
+  if (!admin) {
+    return { message: "Acesso negado." };
+  }
+
+  const body = request.body as Partial<StoredStorefront>;
+
+  if (
+    !Array.isArray(body.slides) ||
+    !Array.isArray(body.promoCards)
+  ) {
+    reply.status(400);
+    return { message: "Conteúdo da vitrine inválido." };
+  }
+
+  const storefront: StoredStorefront = {
+    slides: body.slides,
+    promoCards: body.promoCards,
+    updatedAt: new Date().toISOString()
+  };
+
+  await saveStorefront(storefront);
+
+  return storefront;
 });
 
 server.get("/api/products", async (request) => {
@@ -473,6 +628,12 @@ server.get("/api/products/:slug", async (request, reply) => {
 });
 
 server.post("/api/products", async (request, reply) => {
+  const admin = await requireAdmin(request, reply);
+
+  if (!admin) {
+    return { message: "Acesso negado." };
+  }
+
   const body = request.body;
 
   if (!isProductPayload(body)) {
@@ -495,6 +656,12 @@ server.post("/api/products", async (request, reply) => {
 });
 
 server.put("/api/products/:id", async (request, reply) => {
+  const admin = await requireAdmin(request, reply);
+
+  if (!admin) {
+    return { message: "Acesso negado." };
+  }
+
   const params = request.params as { id: string };
   const body = request.body;
 
@@ -529,6 +696,12 @@ server.put("/api/products/:id", async (request, reply) => {
 });
 
 server.delete("/api/products/:id", async (request, reply) => {
+  const admin = await requireAdmin(request, reply);
+
+  if (!admin) {
+    return { message: "Acesso negado." };
+  }
+
   const params = request.params as { id: string };
   const catalogProducts = await readCatalogProducts();
   const nextProducts = catalogProducts.filter((product) => product.id !== params.id);
@@ -543,10 +716,44 @@ server.delete("/api/products/:id", async (request, reply) => {
   return { items: nextProducts };
 });
 
-server.post("/api/products/reset", async () => {
+server.post("/api/products/reset", async (request, reply) => {
+  const admin = await requireAdmin(request, reply);
+
+  if (!admin) {
+    return { message: "Acesso negado." };
+  }
+
   await saveCatalogProducts(products);
 
   return { items: products };
+});
+
+server.get("/api/orders", async (request, reply) => {
+  const admin = await requireAdmin(request, reply);
+
+  if (!admin) {
+    return { message: "Acesso negado." };
+  }
+
+  const orders = await readOrders();
+
+  return { items: orders };
+});
+
+server.get("/api/me/orders", async (request, reply) => {
+  const user = await getAuthenticatedUser(request);
+
+  if (!user) {
+    reply.status(401);
+    return { message: "Faça login para ver suas compras." };
+  }
+
+  const orders = await readOrders();
+  const items = orders.filter(
+    (order) => order.customer.email.toLowerCase() === user.email.toLowerCase()
+  );
+
+  return { items };
 });
 
 server.post("/api/orders", async (request, reply) => {
@@ -569,6 +776,7 @@ server.post("/api/orders", async (request, reply) => {
       quantity?: number;
     }>;
     paymentMethod?: "pix" | "whatsapp";
+    deliveryMethod?: "delivery" | "pickup" | "combine";
   };
 
   if (
@@ -632,6 +840,10 @@ server.post("/api/orders", async (request, reply) => {
   const order: StoredOrder = {
     id: createOrderId(),
     status: "pending_payment",
+    deliveryMethod:
+      body.deliveryMethod === "delivery" || body.deliveryMethod === "pickup"
+        ? body.deliveryMethod
+        : "combine",
     paymentMethod: body.paymentMethod === "whatsapp" ? "whatsapp" : "pix",
     createdAt: new Date().toISOString(),
     customer: {
@@ -651,9 +863,7 @@ server.post("/api/orders", async (request, reply) => {
     totalInCents: safeItems.reduce((total, item) => total + item.subtotalInCents, 0)
   };
 
-  const orders = await readOrders();
-  orders.unshift(order);
-  await saveOrders(orders);
+  await saveOrder(order);
 
   reply.status(201);
   return {
@@ -666,6 +876,12 @@ server.post("/api/orders", async (request, reply) => {
 });
 
 server.get("/api/orders/:id", async (request, reply) => {
+  const admin = await requireAdmin(request, reply);
+
+  if (!admin) {
+    return { message: "Acesso negado." };
+  }
+
   const params = request.params as { id: string };
   const orders = await readOrders();
   const order = orders.find((item) => item.id === params.id);
@@ -678,7 +894,50 @@ server.get("/api/orders/:id", async (request, reply) => {
   return { order };
 });
 
+server.put("/api/orders/:id/status", async (request, reply) => {
+  const admin = await requireAdmin(request, reply);
+
+  if (!admin) {
+    return { message: "Acesso negado." };
+  }
+
+  const params = request.params as { id: string };
+  const body = request.body as { status?: StoredOrder["status"] };
+  const validStatuses: StoredOrder["status"][] = [
+    "pending_payment",
+    "paid",
+    "in_production",
+    "shipped",
+    "delivered",
+    "cancelled"
+  ];
+
+  if (!body.status || !validStatuses.includes(body.status)) {
+    reply.status(400);
+    return { message: "Status inválido." };
+  }
+
+  const orders = await readOrders();
+  const order = orders.find((item) => item.id === params.id);
+
+  if (!order) {
+    reply.status(404);
+    return { message: "Pedido não encontrado." };
+  }
+
+  const nextOrder = { ...order, status: body.status };
+  await saveOrder(nextOrder);
+
+  return { order: nextOrder };
+});
+
 server.post("/api/ai/product-description", async (request, reply) => {
+  const admin = await requireAdmin(request, reply);
+
+  if (!admin) {
+    return { message: "Acesso negado." };
+  }
+
   const body = request.body as {
     name?: string;
     category?: string;

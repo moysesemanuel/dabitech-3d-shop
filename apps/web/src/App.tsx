@@ -15,11 +15,16 @@ import {
   deleteProduct as deleteProductRequest,
   generateProductDescription,
   getCategories,
+  getMyOrders,
+  getOrders,
   getProducts,
+  getStorefront,
   loginUser,
   registerUser,
   resetProducts,
-  updateProduct as updateProductRequest
+  updateOrderStatus,
+  updateProduct as updateProductRequest,
+  updateStorefront
 } from "./api";
 import type {
   AuthUser,
@@ -27,7 +32,8 @@ import type {
   CheckoutCustomer,
   CreateOrderResponse,
   Product,
-  ProductColorOption
+  ProductColorOption,
+  Order
 } from "./types";
 
 import {
@@ -86,6 +92,8 @@ import { AdminPanelHeader } from "./components/admin/AdminPanelHeader";
 import { AdminPromoCardsEditor } from "./components/admin/AdminPromoCardsEditor";
 import { AdminSlidesEditor } from "./components/admin/AdminSlidesEditor";
 import { AdminProductList } from "./components/admin/AdminProductList";
+import { AdminProductEditor } from "./components/admin/AdminProductEditor";
+import { AdminOrdersList } from "./components/admin/AdminOrdersList";
 import { adminSectionLabels, type AdminSection } from "./components/admin/adminSections";
 
 type SortOption = "featured" | "price-asc" | "price-desc" | "name";
@@ -94,6 +102,7 @@ type HeaderView = "all" | "offers" | "favorites";
 type UtilityPanelState = "coupons" | "orders" | "contact" | null;
 type AuthMode = "login" | "register" | null;
 type ToastState = { message: string; tone: "success" | "error" };
+type AdminProductEditorMode = "create" | "edit" | null;
 
 interface CartItem {
   productId: string;
@@ -108,11 +117,6 @@ const mockNotifications = [
 const mockCoupons = [
   { code: "FORMA10", description: "10% off na primeira compra" },
   { code: "SETUP3D", description: "Frete grátis para itens de setup" }
-];
-
-const mockOrders = [
-  { id: "PED-1032", status: "Em produção", product: "Layered Lamp" },
-  { id: "PED-0977", status: "Entregue", product: "Orbit Headset Dock" }
 ];
 
 const defaultHeroSlides: HeroSlide[] = [
@@ -245,11 +249,19 @@ export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [completedOrder, setCompletedOrder] = useState<CreateOrderResponse | null>(null);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [adminOrders, setAdminOrders] = useState<Order[]>([]);
+  const [isLoadingAdminOrders, setIsLoadingAdminOrders] = useState(false);
+  const [adminOrdersError, setAdminOrdersError] = useState<string | null>(null);
+  const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
+  const [isLoadingCustomerOrders, setIsLoadingCustomerOrders] = useState(false);
+  const [customerOrdersError, setCustomerOrdersError] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [adminSection, setAdminSection] = useState<AdminSection>("slides");
   const [activeAdminProductId, setActiveAdminProductId] = useState<string | null>(null);
   const [adminProductDraft, setAdminProductDraft] = useState<Product | null>(null);
+  const [adminProductEditorMode, setAdminProductEditorMode] =
+    useState<AdminProductEditorMode>(null);
   const [isGeneratingAdminDescription, setIsGeneratingAdminDescription] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -288,6 +300,7 @@ export default function App() {
     const storedSelectedAddressId = window.localStorage.getItem("store-selected-address");
     const storedUiState = window.localStorage.getItem("store-ui-state");
     const storedAuth = window.localStorage.getItem("store-auth");
+    const storedCart = window.localStorage.getItem("store-cart");
 
     if (storedSlides) {
       try {
@@ -350,6 +363,8 @@ export default function App() {
           isAdminOpen?: boolean;
           adminSection?: AdminSection;
           activeAdminProductId?: string | null;
+          adminProductEditorMode?: AdminProductEditorMode;
+          isCartOpen?: boolean;
           selectedProductId?: string | null;
           activeProductImageIndex?: number;
           activeCategory?: string;
@@ -362,6 +377,8 @@ export default function App() {
         setIsAdminOpen(Boolean(parsedUiState.isAdminOpen));
         setAdminSection(parsedUiState.adminSection ?? "slides");
         setActiveAdminProductId(parsedUiState.activeAdminProductId ?? null);
+        setAdminProductEditorMode(parsedUiState.adminProductEditorMode ?? null);
+        setIsCartOpen(Boolean(parsedUiState.isCartOpen));
         setActiveProductImageIndex(parsedUiState.activeProductImageIndex ?? 0);
         setActiveCategory(parsedUiState.activeCategory ?? "all");
         setActiveMaterial(parsedUiState.activeMaterial ?? "all");
@@ -376,6 +393,25 @@ export default function App() {
         }
       } catch {
         window.localStorage.removeItem("store-ui-state");
+      }
+    }
+
+    if (storedCart) {
+      try {
+        const parsedCart = JSON.parse(storedCart) as CartItem[];
+
+        if (Array.isArray(parsedCart)) {
+          setCartItems(
+            parsedCart.filter(
+              (item) =>
+                typeof item.productId === "string" &&
+                Number.isFinite(item.quantity) &&
+                item.quantity > 0
+            )
+          );
+        }
+      } catch {
+        window.localStorage.removeItem("store-cart");
       }
     }
 
@@ -459,12 +495,22 @@ export default function App() {
       return;
     }
 
+    window.localStorage.setItem("store-cart", JSON.stringify(cartItems));
+  }, [cartItems, hasRestoredLocalState]);
+
+  useEffect(() => {
+    if (!hasRestoredLocalState) {
+      return;
+    }
+
     window.localStorage.setItem(
       "store-ui-state",
       JSON.stringify({
         isAdminOpen,
         adminSection,
         activeAdminProductId,
+        adminProductEditorMode,
+        isCartOpen,
         selectedProductId: selectedProduct?.id ?? null,
         activeProductImageIndex,
         activeCategory,
@@ -479,6 +525,8 @@ export default function App() {
     isAdminOpen,
     adminSection,
     activeAdminProductId,
+    adminProductEditorMode,
+    isCartOpen,
     selectedProduct,
     activeProductImageIndex,
     activeCategory,
@@ -592,6 +640,25 @@ export default function App() {
           setIsLoading(false);
         }
       }
+
+      try {
+        const storefront = await getStorefront();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (Array.isArray(storefront.slides) && storefront.slides.length > 0) {
+          setSlides(storefront.slides as HeroSlide[]);
+          setAdminSlideDrafts(storefront.slides as HeroSlide[]);
+        }
+
+        if (Array.isArray(storefront.promoCards) && storefront.promoCards.length > 0) {
+          setPromoCards(storefront.promoCards as PromoCard[]);
+        }
+      } catch {
+        // Local defaults and localStorage drafts remain available if the backend has no storefront settings.
+      }
     }
 
     load();
@@ -609,6 +676,17 @@ export default function App() {
   const selectedAddress = authUser
     ? addresses.find((address) => address.id === selectedAddressId) ?? addresses[0]
     : null;
+
+  useEffect(() => {
+    if (!hasRestoredLocalState || catalogProducts.length === 0 || cartItems.length === 0) {
+      return;
+    }
+
+    const validProductIds = new Set(catalogProducts.map((product) => product.id));
+    setCartItems((current) =>
+      current.filter((item) => validProductIds.has(item.productId))
+    );
+  }, [cartItems.length, catalogProducts, hasRestoredLocalState]);
 
   function showToast(message: string, tone: ToastState["tone"] = "success") {
     setToast({ message, tone });
@@ -647,6 +725,7 @@ export default function App() {
     setIsAdminOpen(false);
     setActiveAdminProductId(null);
     setAdminProductDraft(null);
+    setAdminProductEditorMode(null);
     setIsCartOpen(false);
     setIsLocationMenuOpen(false);
     setIsCategoriesMenuOpen(false);
@@ -698,11 +777,29 @@ export default function App() {
     );
   }
 
-  function saveSlideDrafts() {
-    setSlides(adminSlideDrafts);
-    setActiveSlide((current) => (current >= adminSlideDrafts.length ? 0 : current));
-    setAdminUploadError(null);
-    showToast("Edições do carrossel salvas.");
+  async function persistStorefrontContent(nextSlides: HeroSlide[], nextPromoCards: PromoCard[]) {
+    await updateStorefront(
+      {
+        slides: nextSlides,
+        promoCards: nextPromoCards
+      },
+      authToken
+    );
+  }
+
+  async function saveSlideDrafts() {
+    try {
+      await persistStorefrontContent(adminSlideDrafts, promoCards);
+      setSlides(adminSlideDrafts);
+      setActiveSlide((current) => (current >= adminSlideDrafts.length ? 0 : current));
+      setAdminUploadError(null);
+      showToast("Edições do carrossel salvas.");
+    } catch (error) {
+      setAdminUploadError(
+        error instanceof Error ? error.message : "Não foi possível salvar o carrossel."
+      );
+      showToast("Não foi possível salvar o carrossel.", "error");
+    }
   }
 
   function cancelSlideDrafts() {
@@ -712,9 +809,20 @@ export default function App() {
   }
 
   function updatePromoCard(promoId: string, field: keyof PromoCard, value: string) {
-    setPromoCards((current) =>
-      current.map((promo) => (promo.id === promoId ? { ...promo, [field]: value } : promo))
-    );
+    setPromoCards((current) => {
+      const nextPromoCards = current.map((promo) =>
+        promo.id === promoId ? { ...promo, [field]: value } : promo
+      );
+
+      void persistStorefrontContent(slides, nextPromoCards).catch((error) => {
+        setAdminUploadError(
+          error instanceof Error ? error.message : "Não foi possível salvar os cards."
+        );
+        showToast("Não foi possível salvar os cards.", "error");
+      });
+
+      return nextPromoCards;
+    });
   }
 
   function updateProduct(productId: string, field: keyof Product, value: string | boolean) {
@@ -885,20 +993,88 @@ export default function App() {
   }
 
   function openAdminProductEditor(product: Product) {
+    setAdminSection("products");
     setActiveAdminProductId(product.id);
     setAdminProductDraft(cloneProduct(product));
+    setAdminProductEditorMode("edit");
     setAdminUploadError(null);
+  }
+
+  function changeAdminSection(section: AdminSection) {
+    setAdminSection(section);
+    setActiveAdminProductId(null);
+    setAdminProductDraft(null);
+    setAdminProductEditorMode(null);
+    setAdminUploadError(null);
+  }
+
+  async function loadAdminOrders() {
+    setIsLoadingAdminOrders(true);
+    setAdminOrdersError(null);
+
+    try {
+      const items = await getOrders(authToken);
+      setAdminOrders(items);
+    } catch (error) {
+      setAdminOrdersError(
+        error instanceof Error ? error.message : "Não foi possível carregar pedidos."
+      );
+    } finally {
+      setIsLoadingAdminOrders(false);
+    }
+  }
+
+  async function loadCustomerOrders() {
+    if (!authUser || !authToken) {
+      setCustomerOrders([]);
+      setCustomerOrdersError("Faça login para ver suas compras.");
+      return;
+    }
+
+    setIsLoadingCustomerOrders(true);
+    setCustomerOrdersError(null);
+
+    try {
+      const items = await getMyOrders(authToken);
+      setCustomerOrders(items);
+    } catch (error) {
+      setCustomerOrdersError(
+        error instanceof Error ? error.message : "Não foi possível carregar suas compras."
+      );
+    } finally {
+      setIsLoadingCustomerOrders(false);
+    }
+  }
+
+  async function updateAdminOrderStatus(orderId: string, status: Order["status"]) {
+    try {
+      const order = await updateOrderStatus(orderId, status, authToken);
+      setAdminOrders((current) =>
+        current.map((item) => (item.id === order.id ? order : item))
+      );
+      showToast("Status do pedido atualizado.");
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "Não foi possível atualizar o pedido.",
+        "error"
+      );
+    }
   }
 
   function cancelAdminProductEditor() {
+    const cancelMessage =
+      adminProductEditorMode === "create" ? "Criação cancelada." : "Edição cancelada.";
+
     setActiveAdminProductId(null);
     setAdminProductDraft(null);
+    setAdminProductEditorMode(null);
+    setAdminSection("products");
     setAdminUploadError(null);
-    showToast("Produto salvo.");
+    showToast(cancelMessage);
   }
 
   async function saveAdminProductEditor() {
-    if (!adminProductDraft) {
+    if (!adminProductDraft || !adminProductEditorMode) {
       return;
     }
 
@@ -912,15 +1088,25 @@ export default function App() {
         delete nextProduct.compareAtPriceInCents;
       }
 
-      const { items } = await updateProductRequest(nextProduct);
+      const response =
+        adminProductEditorMode === "create"
+          ? await createProduct(nextProduct, authToken)
+          : await updateProductRequest(nextProduct, authToken);
+      const { items } = response;
       const normalizedProducts = items.map(normalizeProduct);
 
       setProducts(normalizedProducts);
       setEditableProducts(normalizedProducts);
       setActiveAdminProductId(null);
       setAdminProductDraft(null);
+      setAdminProductEditorMode(null);
+      setAdminSection("products");
       setAdminUploadError(null);
-      showToast("Produto salvo no catálogo.");
+      showToast(
+        adminProductEditorMode === "create"
+          ? "Produto criado no catálogo."
+          : "Produto salvo no catálogo."
+      );
     } catch (error) {
       setAdminUploadError(
         error instanceof Error ? error.message : "Não foi possível salvar o produto."
@@ -938,14 +1124,17 @@ export default function App() {
     setAdminUploadError(null);
 
     try {
-      const description = await generateProductDescription({
-        name: adminProductDraft.name,
-        category: adminProductDraft.category,
-        material: adminProductDraft.material,
-        dimensions: adminProductDraft.dimensions,
-        tags: adminProductDraft.tags,
-        colorSummary: (adminProductDraft.colorOptions ?? []).map((option) => option.name).join(", ")
-      });
+      const description = await generateProductDescription(
+        {
+          name: adminProductDraft.name,
+          category: adminProductDraft.category,
+          material: adminProductDraft.material,
+          dimensions: adminProductDraft.dimensions,
+          tags: adminProductDraft.tags,
+          colorSummary: (adminProductDraft.colorOptions ?? []).map((option) => option.name).join(", ")
+        },
+        authToken
+      );
 
       setAdminProductDraft((current) => (current ? { ...current, description } : current));
     } catch (error) {
@@ -957,7 +1146,7 @@ export default function App() {
     }
   }
 
-  async function addNewProduct() {
+  function addNewProduct() {
     const nextId = `p-${Date.now()}`;
     const nextProduct: Product = {
       id: nextId,
@@ -976,34 +1165,25 @@ export default function App() {
       tags: ["novo", "3d"]
     };
 
-    try {
-      const { items } = await createProduct(nextProduct);
-      const normalizedProducts = items.map(normalizeProduct);
-
-      setProducts(normalizedProducts);
-      setEditableProducts(normalizedProducts);
-      setAdminSection("products");
-      setActiveAdminProductId(nextId);
-      setAdminProductDraft(nextProduct);
-      setAdminUploadError(null);
-      showToast("Novo produto criado.");
-    } catch (error) {
-      setAdminUploadError(
-        error instanceof Error ? error.message : "Não foi possível criar o produto."
-      );
-      showToast("Não foi possível criar o produto.", "error");
-    }
+    setAdminSection("product-create");
+    setActiveAdminProductId(nextId);
+    setAdminProductDraft(nextProduct);
+    setAdminProductEditorMode("create");
+    setAdminUploadError(null);
   }
 
   async function removeProduct(productId: string) {
     try {
-      const items = await deleteProductRequest(productId);
+      const items = await deleteProductRequest(productId, authToken);
       const normalizedProducts = items.map(normalizeProduct);
 
       setProducts(normalizedProducts);
       setEditableProducts(normalizedProducts);
       setActiveAdminProductId((current) => (current === productId ? null : current));
       setAdminProductDraft((current) => (current?.id === productId ? null : current));
+      setAdminProductEditorMode((current) =>
+        activeAdminProductId === productId ? null : current
+      );
       setAdminUploadError(null);
       showToast("Produto deletado.");
     } catch (error) {
@@ -1020,13 +1200,15 @@ export default function App() {
     setPromoCards(defaultPromoCards);
     setActiveAdminProductId(null);
     setAdminProductDraft(null);
+    setAdminProductEditorMode(null);
     setAdminUploadError(null);
     window.localStorage.removeItem("store-admin-slides");
     window.localStorage.removeItem("store-admin-promos");
     window.localStorage.removeItem("store-admin-products");
 
     try {
-      const items = await resetProducts();
+      await persistStorefrontContent(defaultHeroSlides, defaultPromoCards);
+      const items = await resetProducts(authToken);
       const normalizedProducts = items.map(normalizeProduct);
 
       setProducts(normalizedProducts);
@@ -1272,6 +1454,15 @@ export default function App() {
   }
 
   function openUtilityPanel(panel: Exclude<UtilityPanelState, null>) {
+    if (panel === "orders" && !authUser) {
+      openAuthDialog("login");
+      return;
+    }
+
+    if (panel === "orders") {
+      void loadCustomerOrders();
+    }
+
     setActiveUtilityPanel(panel);
     setIsProfileMenuOpen(false);
     setIsNotificationsMenuOpen(false);
@@ -1326,6 +1517,22 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function openCartPage() {
+    setIsCartOpen(true);
+    setSelectedProduct(null);
+    setActiveUtilityPanel(null);
+    setIsCategoriesMenuOpen(false);
+    setIsLocationMenuOpen(false);
+    setIsProfileMenuOpen(false);
+    setIsNotificationsMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeCartPage() {
+    setIsCartOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function toggleFavorite(productId: string) {
     setFavoriteIds((current) =>
       current.includes(productId)
@@ -1349,7 +1556,7 @@ export default function App() {
 
       return [...current, { productId, quantity: 1 }];
     });
-    setIsCartOpen(true);
+    openCartPage();
   }
 
   function updateCartQuantity(productId: string, nextQuantity: number) {
@@ -1360,18 +1567,22 @@ export default function App() {
       return;
     }
 
+    const safeQuantity = Math.min(99, Math.floor(nextQuantity));
+
     setCartItems((current) =>
       current.map((item) =>
-        item.productId === productId ? { ...item, quantity: nextQuantity } : item
+        item.productId === productId ? { ...item, quantity: safeQuantity } : item
       )
     );
   }
 
   async function submitOrder({
     customer,
+    deliveryMethod,
     paymentMethod
   }: {
     customer: CheckoutCustomer;
+    deliveryMethod: "delivery" | "pickup" | "combine";
     paymentMethod: "pix" | "whatsapp";
   }) {
     if (!selectedAddress) {
@@ -1389,12 +1600,15 @@ export default function App() {
     try {
       const response = await createOrder({
         customer,
+        deliveryMethod,
         paymentMethod,
         address: selectedAddress,
         items: cartItems
       });
 
       setCompletedOrder(response);
+      setAdminOrders((current) => [response.order, ...current]);
+      setCustomerOrders((current) => [response.order, ...current]);
       setCartItems([]);
       showToast("Pedido criado com sucesso.");
     } catch (error) {
@@ -1550,7 +1764,7 @@ export default function App() {
   }, [activeProductImageIndex, selectedProductGallery.length]);
 
   useEffect(() => {
-    if (!isAdminOpen || !activeAdminProductId) {
+    if (!isAdminOpen || adminProductEditorMode !== "edit" || !activeAdminProductId) {
       return;
     }
 
@@ -1563,7 +1777,15 @@ export default function App() {
     if (product) {
       setAdminProductDraft(cloneProduct(product));
     }
-  }, [isAdminOpen, activeAdminProductId, adminProductDraft, catalogProducts]);
+  }, [isAdminOpen, adminProductEditorMode, activeAdminProductId, adminProductDraft, catalogProducts]);
+
+  useEffect(() => {
+    if (!isAdminOpen || adminSection !== "orders-list") {
+      return;
+    }
+
+    void loadAdminOrders();
+  }, [isAdminOpen, adminSection]);
 
   const cartProducts = cartItems
     .map((item) => {
@@ -1638,13 +1860,17 @@ export default function App() {
           <section className="admin-page-layout">
             <AdminSidebar
               adminSection={adminSection}
-              onChangeSection={setAdminSection}
+              onChangeSection={changeAdminSection}
               onResetStorefront={resetStorefront}
               onAddNewProduct={addNewProduct}
             />
 
             <section className="results-panel admin-page-panel">
-              <AdminPanelHeader adminSection={adminSection} />
+              {(adminSection === "products" || adminSection === "product-create") &&
+              adminProductEditorMode &&
+              adminProductDraft ? null : (
+                <AdminPanelHeader adminSection={adminSection} />
+              )}
 
               {adminUploadError ? <p className="admin-upload-error">{adminUploadError}</p> : null}
 
@@ -1670,17 +1896,24 @@ export default function App() {
                 />
               ) : null}
 
-              {adminSection === "products" ? (
-                <AdminProductList
-                  products={catalogProducts}
+              {adminSection === "orders-list" ? (
+                <AdminOrdersList
+                  orders={adminOrders}
+                  isLoading={isLoadingAdminOrders}
+                  error={adminOrdersError}
+                  onRefresh={loadAdminOrders}
+                  onUpdateStatus={updateAdminOrderStatus}
+                />
+              ) : null}
+
+              {(adminSection === "products" || adminSection === "product-create") &&
+              adminProductEditorMode &&
+              adminProductDraft ? (
+                <AdminProductEditor
+                  mode={adminProductEditorMode}
+                  product={adminProductDraft}
                   categories={categories}
-                  activeAdminProductId={activeAdminProductId}
-                  adminProductDraft={adminProductDraft}
                   isGeneratingAdminDescription={isGeneratingAdminDescription}
-                  onOpenAdminProductEditor={openAdminProductEditor}
-                  onCancelAdminProductEditor={cancelAdminProductEditor}
-                  onSaveAdminProductEditor={saveAdminProductEditor}
-                  onRemoveProduct={removeProduct}
                   onUpdateAdminProductDraft={updateAdminProductDraft}
                   onUpdateAdminProductDraftDimensions={updateAdminProductDraftDimensions}
                   onGenerateAdminDraftDescription={generateAdminDraftDescription}
@@ -1689,10 +1922,20 @@ export default function App() {
                   onProductGalleryInput={handleProductGalleryInput}
                   onProductGalleryDrop={handleProductGalleryDrop}
                   onRemoveAdminProductDraftGalleryImage={removeAdminProductDraftGalleryImage}
+                  onCancelAdminProductEditor={cancelAdminProductEditor}
+                  onSaveAdminProductEditor={saveAdminProductEditor}
                 />
               ) : null}
 
-              {!["slides", "promos", "products"].includes(adminSection) ? (
+              {adminSection === "products" && (!adminProductEditorMode || !adminProductDraft) ? (
+                <AdminProductList
+                  products={catalogProducts}
+                  onOpenAdminProductEditor={openAdminProductEditor}
+                  onRemoveProduct={removeProduct}
+                />
+              ) : null}
+
+              {!["slides", "promos", "orders-list", "products", "product-create"].includes(adminSection) ? (
                 <div className="admin-placeholder">
                   <span className="panel-kicker">Em preparação</span>
                   <h3>{adminSectionLabels[adminSection].title}</h3>
@@ -2089,7 +2332,7 @@ export default function App() {
                   ) : null}
                 </div>
 
-                <button className="cart-link icon-cart" type="button" onClick={() => setIsCartOpen(true)}>
+                <button className="cart-link icon-cart" type="button" onClick={openCartPage}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                     <path d="M3 5h2l2.2 9.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H7" />
                     <circle cx="10" cy="19" r="1.6" />
@@ -2103,7 +2346,24 @@ export default function App() {
         </div>
       </header>
 
-      {selectedProductInCatalog ? (
+      {isCartOpen ? (
+        <>
+          <CartPanel
+            cartCount={cartCount}
+            cartProducts={cartProducts}
+            cartTotalInCents={cartTotalInCents}
+            selectedAddress={selectedAddress ?? null}
+            authUser={authUser}
+            isSubmittingOrder={isSubmittingOrder}
+            completedOrder={completedOrder}
+            onClose={closeCartPage}
+            onRequestAddress={openLocationMenu}
+            onUpdateQuantity={updateCartQuantity}
+            onSubmitOrder={submitOrder}
+          />
+          <StoreFooter />
+        </>
+      ) : selectedProductInCatalog ? (
         <>
           <ProductPageContent
             product={selectedProductInCatalog}
@@ -2165,25 +2425,14 @@ export default function App() {
         </>
       )}
 
-      {isCartOpen ? (
-        <CartPanel
-          cartCount={cartCount}
-          cartProducts={cartProducts}
-          cartTotalInCents={cartTotalInCents}
-          selectedAddress={selectedAddress ?? null}
-          isSubmittingOrder={isSubmittingOrder}
-          completedOrder={completedOrder}
-          onClose={() => setIsCartOpen(false)}
-          onUpdateQuantity={updateCartQuantity}
-          onSubmitOrder={submitOrder}
-        />
-      ) : null}
-
       {activeUtilityPanel ? (
         <UtilityPanel
           activePanel={activeUtilityPanel}
           coupons={mockCoupons}
-          orders={mockOrders}
+          orders={customerOrders}
+          isLoadingOrders={isLoadingCustomerOrders}
+          ordersError={customerOrdersError}
+          onRefreshOrders={loadCustomerOrders}
           onClose={() => setActiveUtilityPanel(null)}
         />
       ) : null}

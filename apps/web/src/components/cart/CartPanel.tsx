@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import type {
+  AuthUser,
   CheckoutAddress,
   CheckoutCustomer,
   CreateOrderResponse,
@@ -13,17 +14,34 @@ interface CartProduct {
   quantity: number;
 }
 
+function getPaymentMethodLabel(paymentMethod: "pix" | "whatsapp") {
+  return paymentMethod === "whatsapp" ? "Combinar pelo WhatsApp" : "Pix manual";
+}
+
+function getDeliveryMethodLabel(deliveryMethod: "delivery" | "pickup" | "combine") {
+  const labels = {
+    delivery: "Entrega no endereço",
+    pickup: "Retirada combinada",
+    combine: "Combinar entrega"
+  };
+
+  return labels[deliveryMethod];
+}
+
 interface CartPanelProps {
   cartCount: number;
   cartProducts: CartProduct[];
   cartTotalInCents: number;
   selectedAddress: CheckoutAddress | null;
+  authUser: AuthUser | null;
   isSubmittingOrder: boolean;
   completedOrder: CreateOrderResponse | null;
   onClose: () => void;
+  onRequestAddress: () => void;
   onUpdateQuantity: (productId: string, nextQuantity: number) => void;
   onSubmitOrder: (payload: {
     customer: CheckoutCustomer;
+    deliveryMethod: "delivery" | "pickup" | "combine";
     paymentMethod: "pix" | "whatsapp";
   }) => Promise<void>;
 }
@@ -33,9 +51,11 @@ export function CartPanel({
   cartProducts,
   cartTotalInCents,
   selectedAddress,
+  authUser,
   isSubmittingOrder,
   completedOrder,
   onClose,
+  onRequestAddress,
   onUpdateQuantity,
   onSubmitOrder
 }: CartPanelProps) {
@@ -45,32 +65,41 @@ export function CartPanel({
     phone: ""
   });
   const [paymentMethod, setPaymentMethod] = useState<"pix" | "whatsapp">("pix");
+  const [deliveryMethod, setDeliveryMethod] =
+    useState<"delivery" | "pickup" | "combine">("combine");
+
+  useEffect(() => {
+    if (!authUser) {
+      return;
+    }
+
+    setCustomer((current) => ({
+      ...current,
+      name: current.name || authUser.name,
+      email: current.email || authUser.email
+    }));
+  }, [authUser]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onSubmitOrder({
       customer,
+      deliveryMethod,
       paymentMethod
     });
   }
 
   return (
-    <aside className="side-panel-backdrop" onClick={onClose}>
-      <div
-        className="side-panel cart-panel"
-        onClick={(event) => event.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Carrinho"
-      >
-        <div className="side-panel-header">
+    <main className="cart-page">
+      <section className="cart-page-shell">
+        <div className="cart-page-header">
           <div>
             <span className="panel-kicker">Seu carrinho</span>
             <h2>{cartCount} item(ns)</h2>
           </div>
 
           <button className="close-button" type="button" onClick={onClose}>
-            Fechar
+            Continuar comprando
           </button>
         </div>
 
@@ -79,6 +108,21 @@ export function CartPanel({
             <span className="panel-kicker">Pedido criado</span>
             <h3>{completedOrder.order.id}</h3>
             <p>{completedOrder.instructions}</p>
+            <div className="checkout-address">
+              <span>Entrega</span>
+              <strong>
+                {completedOrder.order.address.label} - {completedOrder.order.address.street},{" "}
+                {completedOrder.order.address.city}/{completedOrder.order.address.state}
+              </strong>
+              <span>{getDeliveryMethodLabel(completedOrder.order.deliveryMethod)}</span>
+            </div>
+            <div className="admin-order-items">
+              {completedOrder.order.items.map((item) => (
+                <span key={`${completedOrder.order.id}-${item.productId}`}>
+                  {item.quantity}x {item.name} - {formatCurrency(item.subtotalInCents)}
+                </span>
+              ))}
+            </div>
             <div className="cart-total">
               <span>Total do pedido</span>
               <strong>{formatCurrency(completedOrder.order.totalInCents)}</strong>
@@ -93,91 +137,143 @@ export function CartPanel({
             <p>Adicione itens do catálogo para iniciar a compra.</p>
           </div>
         ) : (
-          <>
-            <div className="cart-items">
-              {cartProducts.map(({ product, quantity }) => (
-                <article key={product.id} className="cart-row">
+          <form className="checkout-layout" onSubmit={handleSubmit}>
+            <div className="checkout-main">
+              <section className="checkout-card">
+                <div className="checkout-card-header">
+                  <span>1</span>
                   <div>
-                    <strong>{product.name}</strong>
-                    <p>{formatCurrency(product.priceInCents)}</p>
+                    <h3>Produtos</h3>
+                    <p>Revise os itens antes de finalizar o pedido.</p>
                   </div>
+                </div>
 
-                  <div className="cart-controls">
-                    <button
-                      className="qty-button"
-                      type="button"
-                      onClick={() => onUpdateQuantity(product.id, quantity - 1)}
-                    >
-                      -
-                    </button>
+                <div className="cart-items">
+                  {cartProducts.map(({ product, quantity }) => (
+                    <article key={product.id} className="cart-row">
+                      <div className="cart-row-copy">
+                        {product.imageUrl ? <img src={product.imageUrl} alt={product.name} /> : null}
+                        <div>
+                          <strong>{product.name}</strong>
+                          <p>{formatCurrency(product.priceInCents)}</p>
+                        </div>
+                      </div>
 
-                    <span>{quantity}</span>
+                      <div className="cart-controls">
+                        <button
+                          className="qty-button"
+                          type="button"
+                          onClick={() => onUpdateQuantity(product.id, quantity - 1)}
+                        >
+                          -
+                        </button>
 
-                    <button
-                      className="qty-button"
-                      type="button"
-                      onClick={() => onUpdateQuantity(product.id, quantity + 1)}
-                    >
-                      +
-                    </button>
+                        <span>{quantity}</span>
+
+                        <button
+                          className="qty-button"
+                          type="button"
+                          onClick={() => onUpdateQuantity(product.id, quantity + 1)}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="checkout-card">
+                <div className="checkout-card-header">
+                  <span>2</span>
+                  <div>
+                    <h3>Entrega</h3>
+                    <p>Escolha onde receber seus produtos.</p>
                   </div>
-                </article>
-              ))}
-            </div>
-
-            <div className="cart-footer">
-              <div className="cart-total">
-                <span>Total</span>
-                <strong>{formatCurrency(cartTotalInCents)}</strong>
-              </div>
-
-              <form className="checkout-form" onSubmit={handleSubmit}>
+                </div>
                 <div className="checkout-address">
-                  <span>Entrega</span>
                   <strong>
                     {selectedAddress
                       ? `${selectedAddress.label} - ${selectedAddress.street}, ${selectedAddress.city}/${selectedAddress.state}`
                       : "Selecione um endereço no topo da página"}
                   </strong>
+                  {!selectedAddress ? (
+                    <button className="ghost-action" type="button" onClick={onRequestAddress}>
+                      Entrar ou cadastrar endereço
+                    </button>
+                  ) : null}
                 </div>
-
                 <label>
-                  <span>Nome completo</span>
-                  <input
-                    value={customer.name}
+                  <span>Tipo de entrega</span>
+                  <select
+                    value={deliveryMethod}
                     onChange={(event) =>
-                      setCustomer((current) => ({ ...current, name: event.target.value }))
+                      setDeliveryMethod(event.target.value as "delivery" | "pickup" | "combine")
                     }
-                    placeholder="Seu nome"
-                    required
-                  />
+                  >
+                    <option value="combine">Combinar entrega</option>
+                    <option value="delivery">Entrega no endereço</option>
+                    <option value="pickup">Retirada combinada</option>
+                  </select>
                 </label>
+              </section>
 
-                <label>
-                  <span>E-mail</span>
-                  <input
-                    type="email"
-                    value={customer.email}
-                    onChange={(event) =>
-                      setCustomer((current) => ({ ...current, email: event.target.value }))
-                    }
-                    placeholder="voce@email.com"
-                    required
-                  />
-                </label>
+              <section className="checkout-card">
+                <div className="checkout-card-header">
+                  <span>3</span>
+                  <div>
+                    <h3>Dados de contato</h3>
+                    <p>Usaremos estes dados para confirmar pagamento e entrega.</p>
+                  </div>
+                </div>
+                <div className="checkout-form-grid">
+                  <label>
+                    <span>Nome completo</span>
+                    <input
+                      value={customer.name}
+                      onChange={(event) =>
+                        setCustomer((current) => ({ ...current, name: event.target.value }))
+                      }
+                      placeholder="Seu nome"
+                      required
+                    />
+                  </label>
 
-                <label>
-                  <span>WhatsApp</span>
-                  <input
-                    value={customer.phone}
-                    onChange={(event) =>
-                      setCustomer((current) => ({ ...current, phone: event.target.value }))
-                    }
-                    placeholder="(00) 00000-0000"
-                    required
-                  />
-                </label>
+                  <label>
+                    <span>E-mail</span>
+                    <input
+                      type="email"
+                      value={customer.email}
+                      onChange={(event) =>
+                        setCustomer((current) => ({ ...current, email: event.target.value }))
+                      }
+                      placeholder="voce@email.com"
+                      required
+                    />
+                  </label>
 
+                  <label>
+                    <span>WhatsApp</span>
+                    <input
+                      value={customer.phone}
+                      onChange={(event) =>
+                        setCustomer((current) => ({ ...current, phone: event.target.value }))
+                      }
+                      placeholder="(00) 00000-0000"
+                      required
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="checkout-card">
+                <div className="checkout-card-header">
+                  <span>4</span>
+                  <div>
+                    <h3>Pagamento</h3>
+                    <p>Escolha como quer concluir a compra.</p>
+                  </div>
+                </div>
                 <label>
                   <span>Pagamento</span>
                   <select
@@ -190,15 +286,46 @@ export function CartPanel({
                     <option value="whatsapp">Combinar pelo WhatsApp</option>
                   </select>
                 </label>
-
-                <button type="submit" disabled={isSubmittingOrder || !selectedAddress}>
-                  {isSubmittingOrder ? "Finalizando..." : "Finalizar pedido"}
-                </button>
-              </form>
+              </section>
             </div>
-          </>
+
+            <aside className="checkout-summary">
+              <span className="panel-kicker">Resumo</span>
+              <h3>Seu pedido</h3>
+
+              <div className="checkout-summary-lines">
+                <div>
+                  <span>Produtos ({cartCount})</span>
+                  <strong>{formatCurrency(cartTotalInCents)}</strong>
+                </div>
+                <div>
+                  <span>Entrega</span>
+                  <strong>{getDeliveryMethodLabel(deliveryMethod)}</strong>
+                </div>
+                <div>
+                  <span>Pagamento</span>
+                  <strong>{getPaymentMethodLabel(paymentMethod)}</strong>
+                </div>
+              </div>
+
+              <div className="checkout-summary-total">
+                <span>Total</span>
+                <strong>{formatCurrency(cartTotalInCents)}</strong>
+              </div>
+
+              <button type="submit" disabled={isSubmittingOrder || !selectedAddress}>
+                {isSubmittingOrder ? "Finalizando..." : "Finalizar pedido"}
+              </button>
+
+              {!selectedAddress ? (
+                <small>Informe um endereço de entrega para liberar a finalização.</small>
+              ) : (
+                <small>Você receberá as instruções de pagamento após criar o pedido.</small>
+              )}
+            </aside>
+          </form>
         )}
-      </div>
-    </aside>
+      </section>
+    </main>
   );
 }

@@ -242,6 +242,25 @@ export async function updateOrderStatus(
   return data.order;
 }
 
+export async function updateOrderNotes(
+  orderId: string,
+  internalNotes: string,
+  authToken?: string | null
+) {
+  const response = await fetch(`${API_URL}/api/orders/${orderId}/notes`, {
+    method: "PUT",
+    headers: buildJsonHeaders(authToken),
+    body: JSON.stringify({ internalNotes })
+  });
+  const data = (await response.json()) as { order?: Order; message?: string };
+
+  if (!response.ok || !data.order) {
+    throw new Error(data.message ?? "Falha ao salvar observações.");
+  }
+
+  return data.order;
+}
+
 export async function getStorefront() {
   const response = await fetch(`${API_URL}/api/storefront`);
   const data = (await response.json()) as {

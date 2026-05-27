@@ -2026,6 +2026,22 @@ button {
   gap: 0.85rem;
 }
 
+.checkout-address-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.checkout-address-grid label,
+.checkout-address-grid label:nth-child(2) {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.checkout-address-grid label:nth-child(2) {
+  grid-column: 1 / -1;
+}
+
 .checkout-form-grid label:first-child {
   grid-column: 1 / -1;
 }
@@ -2157,6 +2173,12 @@ button {
   background: var(--surface);
   box-shadow: var(--shadow);
   padding: 1.25rem;
+}
+
+.content-page-dialog p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
 }
 
 .auth-dialog h2,
@@ -2851,6 +2873,80 @@ button {
 .admin-order-timeline {
   display: grid;
   gap: 0.5rem;
+}
+
+.admin-order-detail-card textarea {
+  min-height: 7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--surface-soft);
+  color: var(--text);
+  padding: 0.8rem;
+  resize: vertical;
+}
+
+.account-page {
+  padding-top: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+.account-page-header,
+.account-card {
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  padding: 1rem;
+}
+
+.account-page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.account-page-header h1,
+.account-page-header p,
+.account-card h2,
+.account-card p {
+  margin: 0;
+}
+
+.account-page-header p,
+.account-card p,
+.account-order-card span {
+  color: var(--muted);
+}
+
+.account-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.account-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.account-card:first-child {
+  grid-row: span 2;
+}
+
+.account-order-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.account-order-card {
+  display: grid;
+  gap: 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: var(--surface-soft);
+  padding: 0.85rem;
 }
 
 .admin-product-row {
@@ -4122,6 +4218,18 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .account-page-header {
+    flex-direction: column;
+  }
+
+  .account-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-card:first-child {
+    grid-row: auto;
+  }
+
   .product-gallery-panel {
     grid-template-columns: 1fr;
   }
@@ -4221,6 +4329,10 @@ button {
   }
 
   .checkout-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .checkout-address-grid {
     grid-template-columns: 1fr;
   }
 

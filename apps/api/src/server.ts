@@ -77,6 +77,12 @@ interface StoredOrder {
     subtotalInCents: number;
   }>;
   totalInCents: number;
+  internalNotes?: string;
+  statusHistory?: Array<{
+    status: StoredOrder["status"];
+    changedAt: string;
+    changedBy: string;
+  }>;
 }
 
 interface StoredStorefront {
@@ -860,7 +866,15 @@ server.post("/api/orders", async (request, reply) => {
       zipCode: address.zipCode!.trim()
     },
     items: safeItems,
-    totalInCents: safeItems.reduce((total, item) => total + item.subtotalInCents, 0)
+    totalInCents: safeItems.reduce((total, item) => total + item.subtotalInCents, 0),
+    internalNotes: "",
+    statusHistory: [
+      {
+        status: "pending_payment",
+        changedAt: new Date().toISOString(),
+        changedBy: "checkout"
+      }
+    ]
   };
 
   await saveOrder(order);
@@ -925,7 +939,44 @@ server.put("/api/orders/:id/status", async (request, reply) => {
     return { message: "Pedido não encontrado." };
   }
 
-  const nextOrder = { ...order, status: body.status };
+  const nextOrder = {
+    ...order,
+    status: body.status,
+    statusHistory: [
+      ...(order.statusHistory ?? []),
+      {
+        status: body.status,
+        changedAt: new Date().toISOString(),
+        changedBy: admin.email
+      }
+    ]
+  };
+  await saveOrder(nextOrder);
+
+  return { order: nextOrder };
+});
+
+server.put("/api/orders/:id/notes", async (request, reply) => {
+  const admin = await requireAdmin(request, reply);
+
+  if (!admin) {
+    return { message: "Acesso negado." };
+  }
+
+  const params = request.params as { id: string };
+  const body = request.body as { internalNotes?: string };
+  const orders = await readOrders();
+  const order = orders.find((item) => item.id === params.id);
+
+  if (!order) {
+    reply.status(404);
+    return { message: "Pedido não encontrado." };
+  }
+
+  const nextOrder = {
+    ...order,
+    internalNotes: String(body.internalNotes ?? "").slice(0, 2000)
+  };
   await saveOrder(nextOrder);
 
   return { order: nextOrder };

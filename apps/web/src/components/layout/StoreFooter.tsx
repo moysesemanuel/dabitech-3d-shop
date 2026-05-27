@@ -25,7 +25,11 @@ const footerSections = [
 
 const paymentMethods = ["VISA", "Mastercard", "Elo", "Amex", "Boleto", "Pix"];
 
-export function StoreFooter() {
+interface StoreFooterProps {
+  onOpenPage?: (title: string) => void;
+}
+
+export function StoreFooter({ onOpenPage }: StoreFooterProps) {
   return (
     <footer className="store-footer">
       <div className="store-footer-inner">
@@ -43,7 +47,7 @@ export function StoreFooter() {
               <ul>
                 {section.links.map((link) => (
                   <li key={link}>
-                    <button type="button">{link}</button>
+                    <button type="button" onClick={() => onOpenPage?.(link)}>{link}</button>
                   </li>
                 ))}
               </ul>
@@ -79,7 +83,7 @@ export function StoreFooter() {
         </div>
 
         <div className="store-footer-bottom">
-          <span>© 2026 Forma 3D. Todos os direitos reservados.</span>
+          <span>© 2026 DaBi Tech 3D. Todos os direitos reservados.</span>
           <span>CNPJ e dados fiscais podem ser configurados no painel administrativo.</span>
         </div>
       </div>

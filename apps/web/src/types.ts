@@ -69,6 +69,12 @@ export interface Order {
     subtotalInCents: number;
   }>;
   totalInCents: number;
+  internalNotes?: string;
+  statusHistory?: Array<{
+    status: Order["status"];
+    changedAt: string;
+    changedBy: string;
+  }>;
 }
 
 export interface CreateOrderResponse {

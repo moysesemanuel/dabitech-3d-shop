@@ -23,12 +23,14 @@ import {
   registerUser,
   resetProducts,
   updateOrderStatus,
+  updateOrderNotes,
   updateProduct as updateProductRequest,
   updateStorefront
 } from "./api";
 import type {
   AuthUser,
   Category,
+  CheckoutAddress,
   CheckoutCustomer,
   CreateOrderResponse,
   Product,
@@ -103,6 +105,29 @@ type UtilityPanelState = "coupons" | "orders" | "contact" | null;
 type AuthMode = "login" | "register" | null;
 type ToastState = { message: string; tone: "success" | "error" };
 type AdminProductEditorMode = "create" | "edit" | null;
+
+const contentPageCopy: Record<string, string> = {
+  "Política de privacidade":
+    "Coletamos apenas dados necessários para cadastro, compra, entrega e atendimento. Os dados não são vendidos e podem ser atualizados mediante solicitação.",
+  "Termos de uso":
+    "Ao comprar na DaBi Tech 3D, o cliente concorda com os prazos informados, características de produção 3D e atendimento para confirmação do pedido.",
+  "Trocas e devoluções":
+    "Produtos com defeito de fabricação podem ser avaliados para troca. Produtos personalizados seguem regras específicas combinadas antes da produção.",
+  "Envio e entrega":
+    "A entrega pode ser combinada, retirada ou enviada conforme disponibilidade operacional. Prazos finais são confirmados após o pedido.",
+  Garantia:
+    "A garantia cobre defeitos de fabricação e não cobre mau uso, queda, exposição excessiva a calor ou alterações feitas por terceiros.",
+  "Prazos de produção":
+    "Os prazos variam conforme fila de produção, material e acabamento. A confirmação é feita no atendimento do pedido.",
+  "Sobre a Forma 3D":
+    "A DaBi Tech 3D desenvolve produtos 3D autorais para colecionáveis, decoração e organização de ambientes.",
+  "Produção sob demanda":
+    "Alguns itens são produzidos sob demanda para reduzir estoque parado e permitir ajustes de cor ou acabamento.",
+  "Materiais utilizados":
+    "Usamos materiais adequados para impressão 3D, com foco em acabamento, resistência e uso decorativo ou funcional.",
+  "Contato comercial":
+    "Para parcerias, brindes corporativos ou pedidos especiais, entre em contato pelos canais de atendimento da loja."
+};
 
 interface CartItem {
   productId: string;
@@ -273,6 +298,8 @@ export default function App() {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationsMenuOpen, setIsNotificationsMenuOpen] = useState(false);
   const [activeUtilityPanel, setActiveUtilityPanel] = useState<UtilityPanelState>(null);
+  const [activeContentPageTitle, setActiveContentPageTitle] = useState<string | null>(null);
+  const [isAccountPageOpen, setIsAccountPageOpen] = useState(false);
   const [adminUploadError, setAdminUploadError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [hasRestoredLocalState, setHasRestoredLocalState] = useState(false);
@@ -714,6 +741,7 @@ export default function App() {
   }
 
   function resetStorefront() {
+    window.history.pushState(null, "", "/");
     setActiveView("all");
     setActiveCategory("all");
     setActiveMaterial("all");
@@ -727,6 +755,7 @@ export default function App() {
     setAdminProductDraft(null);
     setAdminProductEditorMode(null);
     setIsCartOpen(false);
+    setIsAccountPageOpen(false);
     setIsLocationMenuOpen(false);
     setIsCategoriesMenuOpen(false);
     setIsProfileMenuOpen(false);
@@ -1056,6 +1085,21 @@ export default function App() {
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : "Não foi possível atualizar o pedido.",
+        "error"
+      );
+    }
+  }
+
+  async function updateAdminOrderNotes(orderId: string, internalNotes: string) {
+    try {
+      const order = await updateOrderNotes(orderId, internalNotes, authToken);
+      setAdminOrders((current) =>
+        current.map((item) => (item.id === order.id ? order : item))
+      );
+      showToast("Observações do pedido salvas.");
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "Não foi possível salvar observações.",
         "error"
       );
     }
@@ -1469,6 +1513,21 @@ export default function App() {
     setIsCategoriesMenuOpen(false);
   }
 
+  function openAccountPage() {
+    if (!authUser) {
+      openAuthDialog("login");
+      return;
+    }
+
+    setIsAccountPageOpen(true);
+    setIsCartOpen(false);
+    setSelectedProduct(null);
+    setActiveUtilityPanel(null);
+    setIsProfileMenuOpen(false);
+    void loadCustomerOrders();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function openAdminPanel() {
     if (!authUser) {
       openAuthDialog("login");
@@ -1505,7 +1564,9 @@ export default function App() {
   }
 
   function openProductPage(product: Product) {
+    window.history.pushState(null, "", `/produto/${product.slug}`);
     setSelectedProduct(product);
+    setIsAccountPageOpen(false);
     setActiveProductImageIndex(0);
     setSelectedColorOptionId(product.colorOptions?.[0]?.id ?? null);
     setIsCartOpen(false);
@@ -1519,6 +1580,7 @@ export default function App() {
 
   function openCartPage() {
     setIsCartOpen(true);
+    setIsAccountPageOpen(false);
     setSelectedProduct(null);
     setActiveUtilityPanel(null);
     setIsCategoriesMenuOpen(false);
@@ -1529,6 +1591,7 @@ export default function App() {
   }
 
   function closeCartPage() {
+    window.history.pushState(null, "", "/");
     setIsCartOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -1578,18 +1641,15 @@ export default function App() {
 
   async function submitOrder({
     customer,
+    address,
     deliveryMethod,
     paymentMethod
   }: {
     customer: CheckoutCustomer;
+    address: CheckoutAddress;
     deliveryMethod: "delivery" | "pickup" | "combine";
     paymentMethod: "pix" | "whatsapp";
   }) {
-    if (!selectedAddress) {
-      showToast("Selecione um endereço de entrega antes de finalizar.", "error");
-      return;
-    }
-
     if (cartItems.length === 0) {
       showToast("Adicione pelo menos um produto ao carrinho.", "error");
       return;
@@ -1602,7 +1662,7 @@ export default function App() {
         customer,
         deliveryMethod,
         paymentMethod,
-        address: selectedAddress,
+        address,
         items: cartItems
       });
 
@@ -1684,6 +1744,26 @@ export default function App() {
   const selectedProductInCatalog = selectedProduct
     ? catalogProducts.find((product) => product.id === selectedProduct.id) ?? null
     : null;
+
+  useEffect(() => {
+    if (catalogProducts.length === 0 || selectedProduct) {
+      return;
+    }
+
+    const [, route, slug] = window.location.pathname.split("/");
+
+    if (route !== "produto" || !slug) {
+      return;
+    }
+
+    const product = catalogProducts.find((item) => item.slug === slug);
+
+    if (product) {
+      setSelectedProduct(product);
+      setActiveProductImageIndex(0);
+      setSelectedColorOptionId(product.colorOptions?.[0]?.id ?? null);
+    }
+  }, [catalogProducts, selectedProduct]);
   const selectedProductIndex = selectedProductInCatalog
     ? Math.max(
       0,
@@ -1762,6 +1842,23 @@ export default function App() {
       setActiveProductImageIndex(0);
     }
   }, [activeProductImageIndex, selectedProductGallery.length]);
+
+  useEffect(() => {
+    const baseTitle = "DaBi Tech 3D";
+
+    if (!selectedProductInCatalog) {
+      document.title = `${baseTitle} | Produtos 3D`;
+      document
+        .querySelector("meta[name='description']")
+        ?.setAttribute("content", "Produtos 3D autorais para setup, decoração e colecionáveis.");
+      return;
+    }
+
+    document.title = `${selectedProductInCatalog.name} | ${baseTitle}`;
+    document
+      .querySelector("meta[name='description']")
+      ?.setAttribute("content", selectedProductInCatalog.description.slice(0, 155));
+  }, [selectedProductInCatalog]);
 
   useEffect(() => {
     if (!isAdminOpen || adminProductEditorMode !== "edit" || !activeAdminProductId) {
@@ -1903,6 +2000,7 @@ export default function App() {
                   error={adminOrdersError}
                   onRefresh={loadAdminOrders}
                   onUpdateStatus={updateAdminOrderStatus}
+                  onUpdateNotes={updateAdminOrderNotes}
                 />
               ) : null}
 
@@ -2233,6 +2331,15 @@ export default function App() {
                           <span>{authUser.email}</span>
                         </div>
                       ) : null}
+                      {authUser ? (
+                        <button
+                          className="profile-popup-item"
+                          type="button"
+                          onClick={openAccountPage}
+                        >
+                          Minha conta
+                        </button>
+                      ) : null}
                       {!authUser ? (
                         <>
                           <button
@@ -2300,7 +2407,7 @@ export default function App() {
                   ) : null}
                 </div>
 
-                <button className="header-link" type="button" onClick={() => openUtilityPanel("orders")}>
+                <button className="header-link" type="button" onClick={openAccountPage}>
                   Compras
                 </button>
                 <button
@@ -2346,7 +2453,64 @@ export default function App() {
         </div>
       </header>
 
-      {isCartOpen ? (
+      {isAccountPageOpen && authUser ? (
+        <>
+          <main className="marketplace-content account-page">
+            <div className="account-page-header">
+              <div>
+                <span className="panel-kicker">Minha conta</span>
+                <h1>{authUser.name}</h1>
+                <p>{authUser.email}</p>
+              </div>
+              <button className="close-button" type="button" onClick={() => setIsAccountPageOpen(false)}>
+                Voltar para loja
+              </button>
+            </div>
+
+            <section className="account-grid">
+              <article className="account-card">
+                <span className="panel-kicker">Compras</span>
+                <h2>Meus pedidos</h2>
+                <button className="ghost-action" type="button" onClick={loadCustomerOrders}>
+                  {isLoadingCustomerOrders ? "Atualizando..." : "Atualizar pedidos"}
+                </button>
+                {customerOrdersError ? <p className="admin-upload-error">{customerOrdersError}</p> : null}
+                <div className="account-order-list">
+                  {customerOrders.length === 0 ? (
+                    <p>Você ainda não possui pedidos.</p>
+                  ) : null}
+                  {customerOrders.map((order) => (
+                    <div key={order.id} className="account-order-card">
+                      <strong>{order.id}</strong>
+                      <span>{order.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}</span>
+                      <span>{formatCurrency(order.totalInCents)}</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="account-card">
+                <span className="panel-kicker">Endereços</span>
+                <h2>Endereços salvos</h2>
+                {addresses.map((address) => (
+                  <p key={address.id}>{buildAddressDetails(address)}</p>
+                ))}
+              </article>
+
+              <article className="account-card">
+                <span className="panel-kicker">Dados cadastrais</span>
+                <h2>Conta</h2>
+                <p>Nome: {authUser.name}</p>
+                <p>E-mail: {authUser.email}</p>
+                <button className="ghost-action danger-ghost" type="button" onClick={signOut}>
+                  Sair da conta
+                </button>
+              </article>
+            </section>
+          </main>
+          <StoreFooter onOpenPage={setActiveContentPageTitle} />
+        </>
+      ) : isCartOpen ? (
         <>
           <CartPanel
             cartCount={cartCount}
@@ -2361,7 +2525,7 @@ export default function App() {
             onUpdateQuantity={updateCartQuantity}
             onSubmitOrder={submitOrder}
           />
-          <StoreFooter />
+          <StoreFooter onOpenPage={setActiveContentPageTitle} />
         </>
       ) : selectedProductInCatalog ? (
         <>
@@ -2379,7 +2543,10 @@ export default function App() {
             relatedProducts={relatedProducts}
             favoriteIds={favoriteIds}
             isImageZoomOpen={isProductImageZoomOpen}
-            onBack={() => setSelectedProduct(null)}
+            onBack={() => {
+              window.history.pushState(null, "", "/");
+              setSelectedProduct(null);
+            }}
             onChangeImage={setActiveProductImageIndex}
             onOpenZoom={() => setIsProductImageZoomOpen(true)}
             onCloseZoom={() => setIsProductImageZoomOpen(false)}
@@ -2388,7 +2555,7 @@ export default function App() {
             onAddToCart={addToCart}
             onToggleFavorite={toggleFavorite}
           />
-          <StoreFooter />
+          <StoreFooter onOpenPage={setActiveContentPageTitle} />
         </>
       ) : (
         <>
@@ -2421,7 +2588,7 @@ export default function App() {
               onToggleFavorite={toggleFavorite}
               onResetStorefront={resetStorefront}
             />
-            <StoreFooter />
+            <StoreFooter onOpenPage={setActiveContentPageTitle} />
         </>
       )}
 
@@ -2435,6 +2602,26 @@ export default function App() {
           onRefreshOrders={loadCustomerOrders}
           onClose={() => setActiveUtilityPanel(null)}
         />
+      ) : null}
+
+      {activeContentPageTitle ? (
+        <div className="auth-dialog-backdrop" onClick={() => setActiveContentPageTitle(null)}>
+          <section className="auth-dialog content-page-dialog" onClick={(event) => event.stopPropagation()}>
+            <div className="auth-dialog-header">
+              <div>
+                <span className="panel-kicker">Informações da loja</span>
+                <h2>{activeContentPageTitle}</h2>
+              </div>
+              <button className="close-button" type="button" onClick={() => setActiveContentPageTitle(null)}>
+                Fechar
+              </button>
+            </div>
+            <p>
+              {contentPageCopy[activeContentPageTitle] ??
+                "Esta página institucional está preparada para edição no painel administrativo em uma próxima etapa."}
+            </p>
+          </section>
+        </div>
       ) : null}
 
       {authMode ? (

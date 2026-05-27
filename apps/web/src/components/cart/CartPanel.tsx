@@ -41,6 +41,7 @@ interface CartPanelProps {
   onUpdateQuantity: (productId: string, nextQuantity: number) => void;
   onSubmitOrder: (payload: {
     customer: CheckoutCustomer;
+    address: CheckoutAddress;
     deliveryMethod: "delivery" | "pickup" | "combine";
     paymentMethod: "pix" | "whatsapp";
   }) => Promise<void>;
@@ -67,6 +68,22 @@ export function CartPanel({
   const [paymentMethod, setPaymentMethod] = useState<"pix" | "whatsapp">("pix");
   const [deliveryMethod, setDeliveryMethod] =
     useState<"delivery" | "pickup" | "combine">("combine");
+  const [checkoutAddress, setCheckoutAddress] = useState<CheckoutAddress>({
+    label: "",
+    street: "",
+    district: "",
+    city: "",
+    state: "",
+    zipCode: ""
+  });
+  const addressIsComplete = [
+    checkoutAddress.label,
+    checkoutAddress.street,
+    checkoutAddress.district,
+    checkoutAddress.city,
+    checkoutAddress.state,
+    checkoutAddress.zipCode
+  ].every((value) => value.trim().length > 0);
 
   useEffect(() => {
     if (!authUser) {
@@ -80,10 +97,19 @@ export function CartPanel({
     }));
   }, [authUser]);
 
+  useEffect(() => {
+    if (!selectedAddress) {
+      return;
+    }
+
+    setCheckoutAddress(selectedAddress);
+  }, [selectedAddress]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onSubmitOrder({
       customer,
+      address: checkoutAddress,
       deliveryMethod,
       paymentMethod
     });
@@ -193,15 +219,84 @@ export function CartPanel({
                 </div>
                 <div className="checkout-address">
                   <strong>
-                    {selectedAddress
-                      ? `${selectedAddress.label} - ${selectedAddress.street}, ${selectedAddress.city}/${selectedAddress.state}`
-                      : "Selecione um endereço no topo da página"}
+                    {addressIsComplete
+                      ? `${checkoutAddress.label} - ${checkoutAddress.street}, ${checkoutAddress.city}/${checkoutAddress.state}`
+                      : "Informe um endereço de entrega"}
                   </strong>
-                  {!selectedAddress ? (
-                    <button className="ghost-action" type="button" onClick={onRequestAddress}>
-                      Entrar ou cadastrar endereço
-                    </button>
-                  ) : null}
+                  <button className="ghost-action" type="button" onClick={onRequestAddress}>
+                    Usar endereços salvos
+                  </button>
+                </div>
+                <div className="checkout-address-grid">
+                  <label>
+                    <span>Apelido</span>
+                    <input
+                      value={checkoutAddress.label}
+                      onChange={(event) =>
+                        setCheckoutAddress((current) => ({ ...current, label: event.target.value }))
+                      }
+                      placeholder="Casa, trabalho..."
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span>Rua e número</span>
+                    <input
+                      value={checkoutAddress.street}
+                      onChange={(event) =>
+                        setCheckoutAddress((current) => ({ ...current, street: event.target.value }))
+                      }
+                      placeholder="Rua, avenida, número"
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span>Bairro</span>
+                    <input
+                      value={checkoutAddress.district}
+                      onChange={(event) =>
+                        setCheckoutAddress((current) => ({ ...current, district: event.target.value }))
+                      }
+                      placeholder="Bairro"
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span>Cidade</span>
+                    <input
+                      value={checkoutAddress.city}
+                      onChange={(event) =>
+                        setCheckoutAddress((current) => ({ ...current, city: event.target.value }))
+                      }
+                      placeholder="Cidade"
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span>UF</span>
+                    <input
+                      value={checkoutAddress.state}
+                      onChange={(event) =>
+                        setCheckoutAddress((current) => ({
+                          ...current,
+                          state: event.target.value.toUpperCase().slice(0, 2)
+                        }))
+                      }
+                      placeholder="PR"
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span>CEP</span>
+                    <input
+                      value={checkoutAddress.zipCode}
+                      onChange={(event) =>
+                        setCheckoutAddress((current) => ({ ...current, zipCode: event.target.value }))
+                      }
+                      placeholder="00000-000"
+                      required
+                    />
+                  </label>
                 </div>
                 <label>
                   <span>Tipo de entrega</span>
@@ -313,12 +408,12 @@ export function CartPanel({
                 <strong>{formatCurrency(cartTotalInCents)}</strong>
               </div>
 
-              <button type="submit" disabled={isSubmittingOrder || !selectedAddress}>
+              <button type="submit" disabled={isSubmittingOrder || !addressIsComplete}>
                 {isSubmittingOrder ? "Finalizando..." : "Finalizar pedido"}
               </button>
 
-              {!selectedAddress ? (
-                <small>Informe um endereço de entrega para liberar a finalização.</small>
+              {!addressIsComplete ? (
+                <small>Informe o endereço completo para liberar a finalização.</small>
               ) : (
                 <small>Você receberá as instruções de pagamento após criar o pedido.</small>
               )}

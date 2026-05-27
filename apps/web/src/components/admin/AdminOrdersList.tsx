@@ -9,6 +9,7 @@ interface AdminOrdersListProps {
   error: string | null;
   onRefresh: () => void | Promise<void>;
   onUpdateStatus: (orderId: string, status: Order["status"]) => void | Promise<void>;
+  onUpdateNotes: (orderId: string, internalNotes: string) => void | Promise<void>;
 }
 
 function formatOrderDate(value: string) {
@@ -23,6 +24,16 @@ function formatOrderDate(value: string) {
 
 function formatPaymentMethod(paymentMethod: Order["paymentMethod"]) {
   return paymentMethod === "whatsapp" ? "WhatsApp" : "Pix";
+}
+
+function formatDeliveryMethod(deliveryMethod: Order["deliveryMethod"]) {
+  const labels: Record<Order["deliveryMethod"], string> = {
+    delivery: "Entrega no endereço",
+    pickup: "Retirada combinada",
+    combine: "Combinar entrega"
+  };
+
+  return labels[deliveryMethod];
 }
 
 function formatAddress(order: Order) {
@@ -42,9 +53,11 @@ export function AdminOrdersList({
   isLoading,
   error,
   onRefresh,
-  onUpdateStatus
+  onUpdateStatus,
+  onUpdateNotes
 }: AdminOrdersListProps) {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Order["status"] | "all">("all");
   const selectedOrder = orders.find((order) => order.id === selectedOrderId) ?? null;
@@ -76,7 +89,10 @@ export function AdminOrdersList({
           <button
             className="admin-back-button"
             type="button"
-            onClick={() => setSelectedOrderId(null)}
+            onClick={() => {
+              setNotesDraft("");
+              setSelectedOrderId(null);
+            }}
           >
             <span aria-hidden="true">←</span>
             <span>Voltar para pedidos</span>
@@ -106,7 +122,7 @@ export function AdminOrdersList({
               <option value="in_production">Em produção</option>
               <option value="shipped">Enviado</option>
               <option value="delivered">Entregue</option>
-              <option value="cancelled">Cancelado</option>
+                  <option value="cancelled">Cancelado</option>
             </select>
           </label>
         </section>
@@ -122,6 +138,7 @@ export function AdminOrdersList({
           <section className="admin-order-detail-card">
             <span className="panel-kicker">Entrega</span>
             <strong>{selectedOrder.address.label}</strong>
+            <p>{formatDeliveryMethod(selectedOrder.deliveryMethod ?? "combine")}</p>
             <p>{formatAddress(selectedOrder)}</p>
           </section>
 
@@ -161,6 +178,33 @@ export function AdminOrdersList({
             <span>2. Mover para em produção.</span>
             <span>3. Atualizar para enviado quando despachar.</span>
             <span>4. Marcar como entregue ao concluir.</span>
+          </div>
+        </section>
+
+        <section className="admin-order-detail-card">
+          <span className="panel-kicker">Observações internas</span>
+          <textarea
+            value={notesDraft || selectedOrder.internalNotes || ""}
+            onChange={(event) => setNotesDraft(event.target.value)}
+            placeholder="Anote informações operacionais sobre pagamento, produção, entrega ou atendimento."
+          />
+          <button
+            className="admin-primary-action"
+            type="button"
+            onClick={() => onUpdateNotes(selectedOrder.id, notesDraft || selectedOrder.internalNotes || "")}
+          >
+            Salvar observações
+          </button>
+        </section>
+
+        <section className="admin-order-detail-card">
+          <span className="panel-kicker">Histórico de status</span>
+          <div className="admin-order-timeline">
+            {(selectedOrder.statusHistory ?? []).map((entry, index) => (
+              <span key={`${entry.status}-${entry.changedAt}-${index}`}>
+                {formatOrderDate(entry.changedAt)} - {entry.status} por {entry.changedBy}
+              </span>
+            ))}
           </div>
         </section>
       </div>
@@ -286,7 +330,10 @@ export function AdminOrdersList({
                 <button
                   className="ghost-action"
                   type="button"
-                  onClick={() => setSelectedOrderId(order.id)}
+                  onClick={() => {
+                    setNotesDraft(order.internalNotes ?? "");
+                    setSelectedOrderId(order.id);
+                  }}
                 >
                   Ver detalhes
                 </button>
